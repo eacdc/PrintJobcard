@@ -10,8 +10,9 @@
   // ---------------------------------------------------------------------------
   // Config: backend API for job card data (procedure ProductionWorkOrderPrint for packaging header)
   // ---------------------------------------------------------------------------
+  const isLocalHost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
   const CONFIG = {
-    apiBaseUrl: 'http://localhost:3001/api', // backend that runs Job Card API; change if different host/port
+    apiBaseUrl: isLocalHost ? 'http://localhost:3001/api' : 'https://cdcapi.onrender.com/api',
     useApi: true // when true and apiBaseUrl set, search calls API; 00001/00002 still use sample data
   };
 
