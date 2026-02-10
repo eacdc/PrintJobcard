@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Card Generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header-section">
+      <div class="header">
+        <h1>Job Card Generator</h1>
+        <p class="subtitle">Search jobs and download packaging or commercial job card PDF</p>
+      </div>
+      <section class="search-section">
+        <div class="search-filters">
+          <div class="filter-group">
+            <label for="jobBookingNo">Job Booking No</label>
+            <input type="text" id="jobBookingNo" placeholder="Job Number" autocomplete="off">
+          </div>
+          <div class="filter-group excel-dropdown-wrap">
+            <label for="clientName">Client Name</label>
+            <div class="excel-dropdown" id="clientNameDropdown">
+              <input type="text" id="clientName" placeholder="Select..." autocomplete="off">
+              <span class="excel-dropdown-arrow" aria-hidden="true">▼</span>
+              <div class="excel-dropdown-list" id="clientNameListBox" role="listbox"></div>
+            </div>
+          </div>
+          <div class="filter-group excel-dropdown-wrap">
+            <label for="salesPerson">Sales Person</label>
+            <div class="excel-dropdown" id="salesPersonDropdown">
+              <input type="text" id="salesPerson" placeholder="Select..." autocomplete="off">
+              <span class="excel-dropdown-arrow" aria-hidden="true">▼</span>
+              <div class="excel-dropdown-list" id="salesPersonListBox" role="listbox"></div>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label for="fromJobDate">From Job Date</label>
+            <input type="date" id="fromJobDate" autocomplete="off">
+          </div>
+          <div class="filter-group">
+            <label for="toJobDate">To Job Date</label>
+            <input type="date" id="toJobDate" autocomplete="off">
+          </div>
+          <div class="filter-group">
+            <label for="database">Database</label>
+            <select id="database">
+              <option value="KOL">KOL</option>
+              <option value="AHM">AHM</option>
+            </select>
+          </div>
+        </div>
+        <div class="search-row">
+          <button type="button" id="searchBtn">Search</button>
+        </div>
+      </section>
+    </header>
+
+    <main class="main">
+      <section class="results-section hidden" id="resultsSection">
+        <div class="results-header">
+          <span>Search results (select a row to download)</span>
+        </div>
+        <div class="table-wrap">
+          <table class="results-table" id="resultsTable">
+            <colgroup id="resultsColgroup"></colgroup>
+            <thead id="resultsThead"></thead>
+            <tbody id="resultsTbody"></tbody>
+          </table>
+        </div>
+        <div class="results-actions hidden" id="resultsActions">
+          <button type="button" id="downloadJobCardBtn" class="btn-primary">Download Job Card</button>
+          <button type="button" id="unselectRowBtn" class="btn-secondary">Unselect</button>
+          <span class="selected-job-info" id="selectedJobInfo"></span>
+        </div>
+      </section>
+
+      <section class="result-section hidden" id="resultSection">
+        <div class="result-header">
+          <span class="job-type-badge" id="jobTypeBadge"></span>
+          <span class="job-id" id="jobIdDisplay"></span>
+        </div>
+        <div class="actions">
+          <button type="button" id="downloadBtn" class="btn-primary">Download Job Card (PDF)</button>
+          <button type="button" id="viewJsonBtn" class="btn-secondary">View JSON</button>
+        </div>
+        <div class="json-preview hidden" id="jsonPreview">
+          <pre id="jsonContent"></pre>
+        </div>
+      </section>
+
+      <section class="results-placeholder" id="resultsPlaceholder">
+        <p>Use filters above and click Search to load jobs.</p>
+      </section>
+
+      <section class="message-section hidden" id="messageSection">
+        <p id="messageText" class="message"></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
