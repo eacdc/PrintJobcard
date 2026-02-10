@@ -205,6 +205,17 @@ body {
   background: var(--blue-hover);
 }
 
+.search-row button.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.search-row button.btn-secondary:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
 .search-row button:disabled {
   opacity: 0.6;
   cursor: not-allowed;

@@ -90,13 +90,17 @@
   const clientNameListBox = $('clientNameListBox');
   const salesPersonListBox = $('salesPersonListBox');
 
-  function showMessage(text, type) {
+  let messageHideTimeout = null;
+  function showMessage(text, type, autoHideMs) {
+    if (messageHideTimeout) { clearTimeout(messageHideTimeout); messageHideTimeout = null; }
     messageSection.classList.remove('hidden');
     messageText.textContent = text;
     messageText.className = 'message ' + (type || '');
+    if (autoHideMs > 0) messageHideTimeout = setTimeout(() => { hideMessage(); messageHideTimeout = null; }, autoHideMs);
   }
 
   function hideMessage() {
+    if (messageHideTimeout) { clearTimeout(messageHideTimeout); messageHideTimeout = null; }
     messageSection.classList.add('hidden');
   }
 
@@ -1182,7 +1186,7 @@
       const doc = type === 'packaging' ? buildPackagingPdf(data) : buildCommercialPdf(data);
       const filename = 'JobCard_' + (data.displayId || jobBookingNo).replace(/\s/g, '_') + '.pdf';
       doc.save(filename);
-      showMessage('Job card downloaded.', 'success');
+      showMessage('Job card downloaded.', 'success', 2000);
     } catch (e) {
       showMessage(e.message || 'Download failed.', 'error');
     } finally {
@@ -1197,7 +1201,20 @@
     selectedJobInfo.textContent = '';
   }
 
+  function clearAllFilters() {
+    if (jobBookingNoInput) jobBookingNoInput.value = '';
+    if (clientNameInput) clientNameInput.value = '';
+    if (salesPersonInput) salesPersonInput.value = '';
+    if (fromJobDateInput) fromJobDateInput.value = '';
+    if (toJobDateInput) toJobDateInput.value = '';
+    if (clientNameListBox) clientNameListBox.classList.remove('open');
+    if (salesPersonListBox) salesPersonListBox.classList.remove('open');
+    hideMessage();
+  }
+
   if (searchBtn) searchBtn.addEventListener('click', searchJobs);
+  const clearFiltersBtn = $('clearFiltersBtn');
+  if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAllFilters);
   const filterInputs = [jobBookingNoInput, clientNameInput, salesPersonInput, fromJobDateInput, toJobDateInput];
   filterInputs.forEach(el => {
     if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchJobs(); });
