@@ -70,6 +70,7 @@
   const resultsTbody = $('resultsTbody');
   const resultsActions = $('resultsActions');
   const downloadJobCardBtn = $('downloadJobCardBtn');
+  const downloadAndPrintBtn = $('downloadAndPrintBtn');
   const unselectRowBtn = $('unselectRowBtn');
   const selectedJobInfo = $('selectedJobInfo');
   const resultsPlaceholder = $('resultsPlaceholder');
@@ -734,6 +735,41 @@
       }
     });
     y = doc.lastAutoTable.finalY + sectionGap();
+
+    // ----- Raw Material QC Details (below Paper Flow, when data present) -----
+    const rawMaterialQCDetails = json.rawMaterialQCDetails || [];
+    if (rawMaterialQCDetails.length > 0) {
+      y = drawSectionHeading('Raw Material QC Details', y);
+      const qcStartPage = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.autoTable({
+        startY: y,
+        head: [['QA Date', 'Trans. Detail ID', 'Item Name', 'Voucher No.', 'Audit Date', 'Remarks', 'Overall Status']],
+        body: rawMaterialQCDetails.map(r => [
+          r.qaDate || '-',
+          r.transactionDetailId != null ? String(r.transactionDetailId) : '-',
+          r.itemName || '-',
+          r.voucherNo || '-',
+          r.auditDate || '-',
+          r.remarks || '-',
+          r.overallStatus || '-'
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 6, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        didDrawPage: function(data) {
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          if (currentPage > qcStartPage) {
+            doc.setFont(fontB, 'bold');
+            doc.setFontSize(10);
+            doc.text('Raw Material QC Details (Continued)', pageW / 2, 10, { align: 'center' });
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
+
     doc.autoTable({
       startY: y,
       body: [
@@ -982,6 +1018,41 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
+    // ----- Raw Material QC Details (below Paper Flow, when data present) -----
+    const rawMaterialQCDetails = json.rawMaterialQCDetails || [];
+    if (rawMaterialQCDetails.length > 0) {
+      if (y > pageH - 60) { doc.addPage(); y = 10; }
+      y = drawSectionHeading('Raw Material QC Details', y);
+      const qcStartPage = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.autoTable({
+        startY: y,
+        head: [['QA Date', 'Trans. Detail ID', 'Item Name', 'Voucher No.', 'Audit Date', 'Remarks', 'Overall Status']],
+        body: rawMaterialQCDetails.map(r => [
+          r.qaDate || '-',
+          r.transactionDetailId != null ? String(r.transactionDetailId) : '-',
+          r.itemName || '-',
+          r.voucherNo || '-',
+          r.auditDate || '-',
+          r.remarks || '-',
+          r.overallStatus || '-'
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 6, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        didDrawPage: function(data) {
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          if (currentPage > qcStartPage) {
+            doc.setFont(fontB, 'bold');
+            doc.setFontSize(10);
+            doc.text('Raw Material QC Details (Continued)', pageW / 2, 10, { align: 'center' });
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
+
     // ----- 6. Footer -----
     const foot = json.footer || {};
     doc.setFont(font, 'normal');
@@ -1194,6 +1265,44 @@
     }
   }
 
+  async function onDownloadAndPrint() {
+    if (!selectedSearchRow) return;
+    const jobBookingNo = selectedSearchRow.jobBookingNo;
+    const type = segmentToType(selectedSearchRow.segmentName);
+    const database = databaseSelect ? databaseSelect.value : 'KOL';
+    if (!jobBookingNo) {
+      showMessage('No job selected.', 'error');
+      return;
+    }
+    const prevText = downloadAndPrintBtn ? downloadAndPrintBtn.textContent : '';
+    if (downloadAndPrintBtn) { downloadAndPrintBtn.disabled = true; downloadAndPrintBtn.classList.add('loading'); downloadAndPrintBtn.textContent = 'Loading...'; }
+    hideMessage();
+    try {
+      const data = await fetchJobData(jobBookingNo, type, database);
+      currentJobNumber = jobBookingNo;
+      currentJobType = type;
+      currentJobJson = data;
+      const doc = type === 'packaging' ? buildPackagingPdf(data) : buildCommercialPdf(data);
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) {
+        setTimeout(function () {
+          try { win.print(); } catch (err) { console.warn('Print failed:', err); }
+          URL.revokeObjectURL(url);
+        }, 800);
+        showMessage('PDF opened for printing.', 'success', 2000);
+      } else {
+        URL.revokeObjectURL(url);
+        showMessage('Allow pop-ups to open PDF in print window, or use Download Job Card.', 'error');
+      }
+    } catch (e) {
+      showMessage(e.message || 'Failed.', 'error');
+    } finally {
+      if (downloadAndPrintBtn) { downloadAndPrintBtn.disabled = false; downloadAndPrintBtn.classList.remove('loading'); downloadAndPrintBtn.textContent = prevText || 'Download & Print'; }
+    }
+  }
+
   function unselectRow() {
     document.querySelectorAll('.results-table tbody tr.result-row.selected').forEach(r => r.classList.remove('selected'));
     selectedSearchRow = null;
@@ -1223,6 +1332,7 @@
   loadFilterOptions();
   setupExcelDropdowns();
   if (downloadJobCardBtn) downloadJobCardBtn.addEventListener('click', onDownloadJobCardFromTable);
+  if (downloadAndPrintBtn) downloadAndPrintBtn.addEventListener('click', onDownloadAndPrint);
   if (unselectRowBtn) unselectRowBtn.addEventListener('click', unselectRow);
   downloadBtn.addEventListener('click', downloadPdf);
   viewJsonBtn.addEventListener('click', toggleJsonPreview);
