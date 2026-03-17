@@ -89,6 +89,15 @@ body {
   align-items: end;
 }
 
+/* Desktop: advanced filters participate in grid; toggle button hidden */
+.advanced-filters-toggle-wrap {
+  display: none;
+}
+
+.advanced-filters {
+  display: contents;
+}
+
 .filter-group label {
   display: block;
   font-weight: 500;
@@ -295,12 +304,12 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
-/* Table wrapper: vertical scroll only, no horizontal */
+/* Table wrapper: vertical and horizontal scroll */
 .table-wrap {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .results-table {
@@ -526,5 +535,92 @@ body {
 @media (max-width: 600px) {
   .search-filters {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Mobile: only Job Booking No + Database visible; rest behind Advanced Search */
+@media (max-width: 768px) {
+  .header-section {
+    height: auto;
+    min-height: 100px;
+    max-height: none;
+  }
+
+  .search-filters {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .advanced-filters-toggle-wrap {
+    display: block;
+    grid-column: 1 / -1;
+  }
+
+  .advanced-filters-toggle-wrap button {
+    width: 100%;
+    padding: 0.5rem;
+  }
+
+  .advanced-filters {
+    display: none;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .search-section.advanced-open .advanced-filters {
+    display: grid;
+  }
+
+  .search-section.advanced-open .advanced-filters-toggle-wrap button {
+    margin-bottom: 0.25rem;
+  }
+
+  /* Table: fill viewport minus header; vertical + horizontal scroll */
+  .results-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 180px);
+  }
+
+  .table-wrap {
+    flex: 1;
+    min-height: 120px;
+    max-height: calc(100vh - 240px);
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .results-table {
+    table-layout: auto;
+    min-width: 600px;
+  }
+
+  .results-table th,
+  .results-table td {
+    white-space: nowrap;
+    min-width: 4rem;
+  }
+
+  /* Footer: smaller buttons so everything fits on one row */
+  .results-actions {
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .results-actions .btn-primary,
+  .results-actions .btn-secondary {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .results-actions .selected-job-info {
+    font-size: 0.7rem;
   }
 }

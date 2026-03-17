@@ -1321,6 +1321,16 @@
     hideMessage();
   }
 
+  const advancedSearchBtn = $('advancedSearchBtn');
+  const searchSection = document.querySelector('.search-section');
+  if (advancedSearchBtn && searchSection) {
+    advancedSearchBtn.addEventListener('click', () => {
+      const isOpen = searchSection.classList.toggle('advanced-open');
+      advancedSearchBtn.setAttribute('aria-expanded', isOpen);
+      advancedSearchBtn.textContent = isOpen ? 'Hide advanced' : 'Advanced Search';
+    });
+  }
+
   if (searchBtn) searchBtn.addEventListener('click', searchJobs);
   const clearFiltersBtn = $('clearFiltersBtn');
   if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAllFilters);
