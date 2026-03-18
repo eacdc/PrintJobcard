@@ -47,12 +47,13 @@
               </div>
             </div>
             <div class="filter-group">
-              <label for="fromJobDate">From Job Date</label>
-              <input type="date" id="fromJobDate" autocomplete="off">
-            </div>
-            <div class="filter-group">
-              <label for="toJobDate">To Job Date</label>
-              <input type="date" id="toJobDate" autocomplete="off">
+              <label for="jobDateRange">Job Date</label>
+              <select id="jobDateRange">
+                <option value="all" selected>All</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="180">Last 180 days</option>
+              </select>
             </div>
           </div>
         </div>

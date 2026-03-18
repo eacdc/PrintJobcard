@@ -60,8 +60,7 @@
   const jobBookingNoInput = $('jobBookingNo');
   const clientNameInput = $('clientName');
   const salesPersonInput = $('salesPerson');
-  const fromJobDateInput = $('fromJobDate');
-  const toJobDateInput = $('toJobDate');
+  const jobDateRangeSelect = $('jobDateRange');
   const databaseSelect = $('database');
   const resultsSection = $('resultsSection');
   const resultsColgroup = $('resultsColgroup');
@@ -1105,18 +1104,18 @@
 
   const SEARCH_COLUMNS = [
     { key: 'jobBookingNo', label: 'Job Booking No', width: 8 },
-    { key: 'segmentName', label: 'Segment', width: 5 },
-    { key: 'categoryName', label: 'Category', width: 6 },
     { key: 'clientName', label: 'Client Name', width: 8 },
     { key: 'salesPersonName', label: 'Sales Person', width: 6 },
     { key: 'jobName', label: 'Job Name', width: 11 },
-    { key: 'jobType', label: 'Job Type', width: 5 },
     { key: 'orderQuantity', label: 'Order Qty', width: 4 },
-    { key: 'coordinatorName', label: 'Coordinator', width: 6 },
+    { key: 'gpnQty', label: 'GpnQty', width: 4 },
+    { key: 'deliveredQty', label: 'DeliveredQty', width: 5 },
+    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5 },
+    { key: 'printStatus', label: 'PrintStatus', width: 5 },
+    { key: 'printEnd', label: 'PrintEnd', width: 6 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
     { key: 'productCode', label: 'Product Code', width: 5 },
     { key: 'refProductMasterCode', label: 'Ref Product Code', width: 5 },
-    { key: 'salesOrderNo', label: 'SO No', width: 7 },
     { key: 'poNo', label: 'PO No', width: 5 },
     { key: 'poDate', label: 'PO Date', width: 5 },
     { key: 'jobBookingDate', label: 'Job Date', width: 5 }
@@ -1170,7 +1169,7 @@
         tr.classList.add('selected');
         selectedSearchRow = row;
         resultsActions.classList.remove('hidden');
-        selectedJobInfo.textContent = row.jobBookingNo + ' · ' + (row.segmentName || 'Packaging');
+        selectedJobInfo.textContent = row.jobBookingNo + (row.clientName ? (' · ' + row.clientName) : '');
       });
       resultsTbody.appendChild(tr);
     });
@@ -1199,14 +1198,30 @@
     const salesPersonText = (salesPersonInput && salesPersonInput.value) ? salesPersonInput.value.trim() : '';
     const salesPersonMatch = salesPersonList.find(s => (s.ledgerName || '').trim() === salesPersonText);
     const salesPersonID = salesPersonMatch ? String(salesPersonMatch.ledgerID) : '';
-    const fromJobDate = (fromJobDateInput && fromJobDateInput.value) ? fromJobDateInput.value : '';
-    const toJobDate = (toJobDateInput && toJobDateInput.value) ? toJobDateInput.value : '';
+    const rangeVal = (jobDateRangeSelect && jobDateRangeSelect.value) ? String(jobDateRangeSelect.value) : 'all';
     const database = databaseSelect ? databaseSelect.value : 'KOL';
     if (jobBookingNo) params.set('jobBookingNo', jobBookingNo);
     if (clientName) params.set('clientName', clientName);
     if (salesPersonID) params.set('salesPersonID', salesPersonID);
-    if (fromJobDate) params.set('fromJobDate', fromJobDate);
-    if (toJobDate) params.set('toJobDate', toJobDate);
+    // Date range filter: send fromJobDate/toJobDate only when not "All"
+    if (rangeVal !== 'all') {
+      const days = parseInt(rangeVal, 10);
+      if (!Number.isNaN(days) && days > 0) {
+        const now = new Date();
+        // Use UTC to avoid timezone date-shifts when backend parses YYYY-MM-DD
+        const to = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+        const from = new Date(to);
+        from.setUTCDate(from.getUTCDate() - days);
+        const fmt = (d) => {
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const dd = String(d.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${dd}`;
+        };
+        params.set('fromJobDate', fmt(from));
+        params.set('toJobDate', fmt(to));
+      }
+    }
     params.set('database', database);
 
     const prevSearchText = searchBtn ? searchBtn.textContent : '';
@@ -1314,8 +1329,7 @@
     if (jobBookingNoInput) jobBookingNoInput.value = '';
     if (clientNameInput) clientNameInput.value = '';
     if (salesPersonInput) salesPersonInput.value = '';
-    if (fromJobDateInput) fromJobDateInput.value = '';
-    if (toJobDateInput) toJobDateInput.value = '';
+    if (jobDateRangeSelect) jobDateRangeSelect.value = 'all';
     if (clientNameListBox) clientNameListBox.classList.remove('open');
     if (salesPersonListBox) salesPersonListBox.classList.remove('open');
     hideMessage();
@@ -1334,7 +1348,7 @@
   if (searchBtn) searchBtn.addEventListener('click', searchJobs);
   const clearFiltersBtn = $('clearFiltersBtn');
   if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAllFilters);
-  const filterInputs = [jobBookingNoInput, clientNameInput, salesPersonInput, fromJobDateInput, toJobDateInput];
+  const filterInputs = [jobBookingNoInput, clientNameInput, salesPersonInput];
   filterInputs.forEach(el => {
     if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchJobs(); });
   });
