@@ -61,6 +61,7 @@
   const clientNameInput = $('clientName');
   const salesPersonInput = $('salesPerson');
   const jobDateRangeSelect = $('jobDateRange');
+  const jobStatusSelect = $('jobStatus');
   const databaseSelect = $('database');
   const resultsSection = $('resultsSection');
   const resultsColgroup = $('resultsColgroup');
@@ -1103,23 +1104,28 @@
   }
 
   const SEARCH_COLUMNS = [
-    { key: 'jobBookingNo', label: 'Job Booking No', width: 8 },
-    { key: 'clientName', label: 'Client Name', width: 8 },
-    { key: 'salesPersonName', label: 'Sales Person', width: 6 },
-    { key: 'jobName', label: 'Job Name', width: 11 },
+    { key: 'jobBookingNo', label: 'Job Booking No', width: 8, filter: 'text' },
+    { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
+    { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
+    { key: 'jobName', label: 'Job Name', width: 11, filter: 'text' },
     { key: 'orderQuantity', label: 'Order Qty', width: 4 },
     { key: 'gpnQty', label: 'GpnQty', width: 4 },
     { key: 'deliveredQty', label: 'DeliveredQty', width: 5 },
     { key: 'bindingProdQty', label: 'BindingProdQty', width: 5 },
-    { key: 'printStatus', label: 'PrintStatus', width: 5 },
+    { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
     { key: 'printEnd', label: 'PrintEnd', width: 6 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
-    { key: 'productCode', label: 'Product Code', width: 5 },
-    { key: 'refProductMasterCode', label: 'Ref Product Code', width: 5 },
-    { key: 'poNo', label: 'PO No', width: 5 },
+    { key: 'productCode', label: 'Product Code', width: 5, filter: 'text' },
+    { key: 'refProductMasterCode', label: 'Ref Product Code', width: 5, filter: 'text' },
+    { key: 'poNo', label: 'PO No', width: 5, filter: 'text' },
     { key: 'poDate', label: 'PO Date', width: 5 },
-    { key: 'jobBookingDate', label: 'Job Date', width: 5 }
+    { key: 'jobBookingDate', label: 'Job Date', width: 5 },
+    { key: 'jobStatus', label: 'Status', width: 5, filter: 'text' }
   ];
+
+  let searchTableFrameReady = false;
+  let headerTextFilters = {};
+  let headerFilterTimer = null;
 
   function formatCellVal(val) {
     if (val == null) return '';
@@ -1133,7 +1139,23 @@
     return s;
   }
 
-  function renderSearchResults(results) {
+  function normalizeFilterStr(val) {
+    return String(val == null ? '' : val).trim().toLowerCase();
+  }
+
+  function applyHeaderTextFilters(rows) {
+    const active = Object.entries(headerTextFilters || {}).filter(([, v]) => normalizeFilterStr(v) !== '');
+    if (active.length === 0) return rows;
+    return (rows || []).filter(row => {
+      return active.every(([key, expected]) => {
+        const actual = normalizeFilterStr(formatCellVal(row ? row[key] : ''));
+        return actual.includes(normalizeFilterStr(expected));
+      });
+    });
+  }
+
+  function ensureSearchTableFrame() {
+    if (searchTableFrameReady) return;
     if (resultsColgroup) {
       resultsColgroup.innerHTML = '';
       SEARCH_COLUMNS.forEach(col => {
@@ -1142,12 +1164,10 @@
         resultsColgroup.appendChild(colEl);
       });
     }
+
     resultsThead.innerHTML = '';
-    resultsTbody.innerHTML = '';
-    if (!results.length) {
-      resultsTbody.innerHTML = '<tr><td colspan="' + SEARCH_COLUMNS.length + '">No rows found.</td></tr>';
-      return;
-    }
+
+    // Header labels
     const theadTr = document.createElement('tr');
     SEARCH_COLUMNS.forEach(col => {
       const th = document.createElement('th');
@@ -1155,6 +1175,49 @@
       theadTr.appendChild(th);
     });
     resultsThead.appendChild(theadTr);
+
+    // Filter row (text columns only)
+    const anyTextFilters = SEARCH_COLUMNS.some(c => c.filter === 'text');
+    if (anyTextFilters) {
+      const filterTr = document.createElement('tr');
+      SEARCH_COLUMNS.forEach(col => {
+        const th = document.createElement('th');
+        if (col.filter === 'text') {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'header-filter-input';
+          input.placeholder = 'Filter...';
+          input.autocomplete = 'off';
+          input.dataset.key = col.key;
+          input.value = headerTextFilters[col.key] || '';
+          input.addEventListener('input', () => {
+            const k = input.dataset.key;
+            headerTextFilters[k] = input.value || '';
+            if (headerFilterTimer) clearTimeout(headerFilterTimer);
+            headerFilterTimer = setTimeout(() => {
+              // reset selection when filtering changes
+              selectedSearchRow = null;
+              resultsActions.classList.add('hidden');
+              selectedJobInfo.textContent = '';
+              renderSearchResultsBody(applyHeaderTextFilters(searchResults));
+            }, 120);
+          });
+          th.appendChild(input);
+        }
+        filterTr.appendChild(th);
+      });
+      resultsThead.appendChild(filterTr);
+    }
+
+    searchTableFrameReady = true;
+  }
+
+  function renderSearchResultsBody(results) {
+    resultsTbody.innerHTML = '';
+    if (!results || results.length === 0) {
+      resultsTbody.innerHTML = '<tr><td colspan="' + SEARCH_COLUMNS.length + '">No rows found.</td></tr>';
+      return;
+    }
     results.forEach((row, index) => {
       const tr = document.createElement('tr');
       tr.dataset.index = index;
@@ -1199,10 +1262,12 @@
     const salesPersonMatch = salesPersonList.find(s => (s.ledgerName || '').trim() === salesPersonText);
     const salesPersonID = salesPersonMatch ? String(salesPersonMatch.ledgerID) : '';
     const rangeVal = (jobDateRangeSelect && jobDateRangeSelect.value) ? String(jobDateRangeSelect.value) : 'all';
+    const jobStatus = (jobStatusSelect && jobStatusSelect.value) ? String(jobStatusSelect.value) : 'all';
     const database = databaseSelect ? databaseSelect.value : 'KOL';
     if (jobBookingNo) params.set('jobBookingNo', jobBookingNo);
     if (clientName) params.set('clientName', clientName);
     if (salesPersonID) params.set('salesPersonID', salesPersonID);
+    if (jobStatus !== 'all') params.set('jobStatus', jobStatus);
     // Date range filter: send fromJobDate/toJobDate only when not "All"
     if (rangeVal !== 'all') {
       const days = parseInt(rangeVal, 10);
@@ -1239,7 +1304,8 @@
       }
       const data = await res.json();
       searchResults = data.results || [];
-      renderSearchResults(searchResults);
+      ensureSearchTableFrame();
+      renderSearchResultsBody(applyHeaderTextFilters(searchResults));
       resultsSection.classList.remove('hidden');
       if (resultsPlaceholder) resultsPlaceholder.classList.add('hidden');
       if (searchResults.length === 0) showMessage('No jobs found. Try different filters.', '');
@@ -1330,6 +1396,11 @@
     if (clientNameInput) clientNameInput.value = '';
     if (salesPersonInput) salesPersonInput.value = '';
     if (jobDateRangeSelect) jobDateRangeSelect.value = 'all';
+    if (jobStatusSelect) jobStatusSelect.value = 'all';
+    headerTextFilters = {};
+    if (resultsThead) {
+      resultsThead.querySelectorAll('input.header-filter-input').forEach(inp => { inp.value = ''; });
+    }
     if (clientNameListBox) clientNameListBox.classList.remove('open');
     if (salesPersonListBox) salesPersonListBox.classList.remove('open');
     hideMessage();

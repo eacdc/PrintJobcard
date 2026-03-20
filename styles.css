@@ -328,6 +328,21 @@ body {
   text-overflow: ellipsis;
 }
 
+.results-table th .header-filter-input {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.results-table th .header-filter-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
 .results-table th {
   background: var(--bg-primary);
   font-weight: 600;
