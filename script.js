@@ -1120,8 +1120,24 @@
     { key: 'poNo', label: 'PO No', width: 5, filter: 'text' },
     { key: 'poDate', label: 'PO Date', width: 5 },
     { key: 'jobBookingDate', label: 'Job Date', width: 5 },
-    { key: 'jobStatus', label: 'Status', width: 5, filter: 'text' }
+    { key: 'status', label: 'Status', width: 5, filter: 'text' },
+    { key: 'statusReason', label: 'Status reason', width: 9, filter: 'text' }
   ];
+
+  /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
+  const SEARCH_TABLE_BUILD_ID = 'v2-status-reason';
+  let builtSearchTableId = '';
+
+  function getSearchRowValue(row, key) {
+    if (!row) return '';
+    if (key === 'status') return row.status != null && row.status !== '' ? row.status : (row.jobStatus != null ? row.jobStatus : '');
+    if (key === 'statusReason') {
+      return row.statusReason != null && row.statusReason !== ''
+        ? row.statusReason
+        : (row.jcSearchStatusReason != null ? row.jcSearchStatusReason : '');
+    }
+    return row[key];
+  }
 
   let searchTableFrameReady = false;
   let headerTextFilters = {};
@@ -1148,14 +1164,16 @@
     if (active.length === 0) return rows;
     return (rows || []).filter(row => {
       return active.every(([key, expected]) => {
-        const actual = normalizeFilterStr(formatCellVal(row ? row[key] : ''));
+        const actual = normalizeFilterStr(formatCellVal(getSearchRowValue(row, key)));
         return actual.includes(normalizeFilterStr(expected));
       });
     });
   }
 
   function ensureSearchTableFrame() {
-    if (searchTableFrameReady) return;
+    if (builtSearchTableId === SEARCH_TABLE_BUILD_ID && searchTableFrameReady) return;
+    builtSearchTableId = SEARCH_TABLE_BUILD_ID;
+    searchTableFrameReady = false;
     if (resultsColgroup) {
       resultsColgroup.innerHTML = '';
       SEARCH_COLUMNS.forEach(col => {
@@ -1169,6 +1187,7 @@
 
     // Header labels
     const theadTr = document.createElement('tr');
+    theadTr.className = 'results-thead-labels';
     SEARCH_COLUMNS.forEach(col => {
       const th = document.createElement('th');
       th.textContent = col.label;
@@ -1180,6 +1199,7 @@
     const anyTextFilters = SEARCH_COLUMNS.some(c => c.filter === 'text');
     if (anyTextFilters) {
       const filterTr = document.createElement('tr');
+      filterTr.className = 'results-thead-filters';
       SEARCH_COLUMNS.forEach(col => {
         const th = document.createElement('th');
         if (col.filter === 'text') {
@@ -1224,7 +1244,7 @@
       tr.classList.add('result-row');
       SEARCH_COLUMNS.forEach(col => {
         const td = document.createElement('td');
-        td.textContent = formatCellVal(row[col.key]);
+        td.textContent = formatCellVal(getSearchRowValue(row, col.key));
         tr.appendChild(td);
       });
       tr.addEventListener('click', function () {

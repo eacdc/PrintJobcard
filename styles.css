@@ -343,13 +343,27 @@ body {
   border-color: var(--primary-color);
 }
 
-.results-table th {
+.results-table thead th {
   background: var(--bg-primary);
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* Two-row thead: label row then filter row — stack sticky offsets so both stay visible */
+.results-table thead tr.results-thead-labels th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.results-table thead tr.results-thead-filters th {
+  position: sticky;
+  top: 2.35rem;
+  z-index: 2;
+  background: var(--bg-secondary);
+  font-weight: 500;
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 .results-table tbody tr.result-row {
