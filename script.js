@@ -647,6 +647,26 @@
       y = doc.lastAutoTable.finalY + sectionGap();
     }
 
+    // ----- Gang Jobs Paper Details (supplementary table) -----
+    const gangPaperDetails = json.gangPaperDetails || [];
+    if (gangPaperDetails.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont(fontB, 'bold');
+      doc.text('GANG JOBS PAPER DETAILS', pageW / 2, y, { align: 'center' });
+      y += 6;
+      doc.autoTable({
+        startY: y,
+        head: [['Item Code', 'Item Name', 'Paper Size', 'Total Sheets', 'Cut Size', 'Cuts', 'Final Qty', 'Item Weight']],
+        body: gangPaperDetails.map(p => [p.itemCode, p.itemName, p.paperSize, p.totalSheets, p.cutSize, p.cuts, p.finalQty, p.itemWeight]),
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 7, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
+
     doc.setFontSize(10);
     doc.setFont(fontB, 'bold');
     doc.text('PAPER DETAILS', pageW / 2, y, { align: 'center' });
