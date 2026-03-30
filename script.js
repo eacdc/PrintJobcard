@@ -822,6 +822,26 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
+    // ----- Delivery Details (below Paper Flow) -----
+    y = drawSectionHeading('Delivery Details', y);
+    const dd = json.deliveryDetails || {};
+    doc.autoTable({
+      startY: y,
+      head: [['Order Qty', 'Gpn Qty', 'Delivered Qty', 'Delivery Date']],
+      body: [[
+        dd.orderQty || '-',
+        dd.gpnQty || '-',
+        dd.deliveredQty || '-',
+        dd.deliveryDate || '-'
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+      margin: { left: margin, right: margin },
+      tableWidth: tableWidth
+    });
+    y = doc.lastAutoTable.finalY + sectionGap();
+
     // ----- Raw Material QC Details (below Paper Flow, when data present) -----
     const rawMaterialQCDetails = json.rawMaterialQCDetails || [];
     if (rawMaterialQCDetails.length > 0) {
