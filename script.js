@@ -984,6 +984,70 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
+    // ----- Gang Jobs (above first component; same layout as packaging) -----
+    const gangJobs = json.gangJobs || [];
+    if (gangJobs.length > 0) {
+      if (y > pageH - 100) { doc.addPage(); y = 10; }
+      doc.setFontSize(10);
+      doc.setFont(fontB, 'bold');
+      doc.text('GANG JOBS', pageW / 2, y, { align: 'center' });
+      y += 6;
+
+      const gangQrDataByRow = gangJobs.map(g => generateQRDataURL(g.jobCardContentNo, 128));
+      const gangBody = gangJobs.map((g, idx) => {
+        const qrDataURL = gangQrDataByRow[idx];
+        return [
+          g.jobBookingNo || '-',
+          g.quantity || '-',
+          g.gangUps || '-',
+          qrDataURL ? '' : (g.jobCardContentNo || '-')
+        ];
+      });
+
+      const gangQrColIndex = 3;
+      doc.autoTable({
+        startY: y,
+        head: [['JobBookingNo', 'Quantity', 'Gang Ups', 'JobCardContentNo (QR)']],
+        body: gangBody,
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', valign: 'middle', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 7, halign: 'center', valign: 'middle', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        columnStyles: {
+          0: { cellWidth: 55 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 55 },
+          3: { cellWidth: tableWidth - 55 - 35 - 55 }
+        },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index === gangQrColIndex) {
+            data.cell.styles.cellPadding = 1;
+            data.cell.styles.minCellHeight = 18;
+          }
+        },
+        didDrawCell: function(data) {
+          if (data.section === 'body' && data.column.index === gangQrColIndex) {
+            const rowIndex = data.row.index;
+            const qrDataURL = gangQrDataByRow[rowIndex];
+            if (!qrDataURL) return;
+
+            const padding = 1;
+            const cellW = data.cell.width;
+            const cellH = data.cell.height;
+            const size = Math.max(0, Math.min(cellW, cellH) - padding * 2);
+            if (size <= 0) return;
+
+            const x = data.cell.x + (cellW - size) / 2;
+            const yy = data.cell.y + (cellH - size) / 2;
+            doc.addImage(qrDataURL, 'PNG', x, yy, size, size);
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
+
     // ----- 4. Per-component sections (each book component: Cover, 8 Spread, 1 Spread, etc.) -----
     const parts = json.parts || [];
     const componentBlockGap = 8;
@@ -1124,7 +1188,28 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
-    // ----- Raw Material QC Details (below Paper Flow, when data present) -----
+    // ----- Delivery Details (after Paper Flow; same columns as packaging) -----
+    if (y > pageH - 50) { doc.addPage(); y = 10; }
+    y = drawSectionHeading('Delivery Details', y);
+    const dd = json.deliveryDetails || {};
+    doc.autoTable({
+      startY: y,
+      head: [['Order Qty', 'Gpn Qty', 'Delivered Qty', 'Delivery Date']],
+      body: [[
+        dd.orderQty || '-',
+        dd.gpnQty || '-',
+        dd.deliveredQty || '-',
+        dd.deliveryDate || '-'
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+      margin: { left: margin, right: margin },
+      tableWidth: tableWidth
+    });
+    y = doc.lastAutoTable.finalY + sectionGap();
+
+    // ----- Raw Material QC Details (below Delivery Details, when data present) -----
     const rawMaterialQCDetails = json.rawMaterialQCDetails || [];
     if (rawMaterialQCDetails.length > 0) {
       if (y > pageH - 60) { doc.addPage(); y = 10; }
