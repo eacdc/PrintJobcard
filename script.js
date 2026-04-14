@@ -186,7 +186,7 @@
 
   /** Derive job card type from segment name (e.g. "Commercial" -> commercial, else packaging). */
   function segmentToType(segmentName) {
-    return (segmentName || '').toLowerCase().includes('commercial') ? 'commercial' : 'packaging';
+    return (segmentName || '').toLowerCase().includes('commercial') || (segmentName || '').toLowerCase().includes('books') ? 'commercial' : 'packaging';
   }
 
   /**
