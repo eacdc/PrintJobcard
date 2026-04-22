@@ -842,6 +842,27 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
+    // ----- Delivery Breakdown (below Delivery Details) -----
+    const deliveryBreakdown = json.deliveryBreakdown || [];
+    y = drawSectionHeading('Delivery Breakdown', y);
+    doc.autoTable({
+      startY: y,
+      head: [['Voucher No', 'Dispatch Qty', 'Delivery Date']],
+      body: deliveryBreakdown.length > 0
+        ? deliveryBreakdown.map(r => [
+            r.voucherNo || '-',
+            r.dispatchQty != null ? String(r.dispatchQty) : '-',
+            r.deliverydate || '-'
+          ])
+        : [['-', '-', '-']],
+      theme: 'grid',
+      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+      margin: { left: margin, right: margin },
+      tableWidth: tableWidth
+    });
+    y = doc.lastAutoTable.finalY + sectionGap();
+
     // ----- Raw Material QC Details (below Paper Flow, when data present) -----
     const rawMaterialQCDetails = json.rawMaterialQCDetails || [];
     if (rawMaterialQCDetails.length > 0) {
@@ -1201,6 +1222,28 @@
         dd.deliveredQty || '-',
         dd.deliveryDate || '-'
       ]],
+      theme: 'grid',
+      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+      margin: { left: margin, right: margin },
+      tableWidth: tableWidth
+    });
+    y = doc.lastAutoTable.finalY + sectionGap();
+
+    // ----- Delivery Breakdown (below Delivery Details) -----
+    if (y > pageH - 60) { doc.addPage(); y = 10; }
+    const deliveryBreakdown = json.deliveryBreakdown || [];
+    y = drawSectionHeading('Delivery Breakdown', y);
+    doc.autoTable({
+      startY: y,
+      head: [['Voucher No', 'Dispatch Qty', 'Delivery Date']],
+      body: deliveryBreakdown.length > 0
+        ? deliveryBreakdown.map(r => [
+            r.voucherNo || '-',
+            r.dispatchQty != null ? String(r.dispatchQty) : '-',
+            r.deliverydate || '-'
+          ])
+        : [['-', '-', '-']],
       theme: 'grid',
       headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
       styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
