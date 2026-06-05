@@ -781,6 +781,32 @@
     });
     y = doc.lastAutoTable.finalY + sectionGap();
 
+    // ----- Batch Details (below Allocated Material Details, above Paper Flow) -----
+    const batchDetails = json.batchDetails || [];
+    if (batchDetails.length > 0) {
+      y = drawSectionHeading('Batch Details', y);
+      const batchStartPage = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.autoTable({
+        startY: y,
+        head: [['Quantity', 'Batch No', 'Mfg Date', 'Exp Date']],
+        body: batchDetails.map(b => [b.quantity ?? '', b.batchNo ?? '', b.mfgDate ?? '', b.expDate ?? '']),
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        didDrawPage: function() {
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          if (currentPage > batchStartPage) {
+            doc.setFont(fontB, 'bold');
+            doc.setFontSize(10);
+            doc.text('Batch Details (Continued)', pageW / 2, 10, { align: 'center' });
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
+
     // ----- Corrugation Details (below Allocated Material Details, only when data present) -----
     const corrugationDetails = json.corrugationDetails || [];
     if (corrugationDetails.length > 0) {
