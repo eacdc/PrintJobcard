@@ -569,10 +569,31 @@ body {
 
 /* Mobile: only Job Booking No + Database visible; rest behind Advanced Search */
 @media (max-width: 768px) {
+  /* Allow page to scroll naturally — prevents action buttons being cut off
+     on devices where the browser chrome eats into 100vh (e.g. Vivo phones) */
+  html, body {
+    height: auto;
+    overflow: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .main {
+    flex: none;
+    overflow: visible;
+    padding: 0 0.75rem 1rem;
+  }
+
   .header-section {
     height: auto;
-    min-height: 100px;
+    min-height: 0;
     max-height: none;
+    overflow: visible;
   }
 
   .search-filters {
@@ -606,19 +627,21 @@ body {
     margin-bottom: 0.25rem;
   }
 
-  /* Table: fill viewport minus header; vertical + horizontal scroll */
+  /* Results section: natural height, no viewport-relative max-height clamp */
   .results-section {
-    flex: 1;
-    min-height: 0;
+    flex: none;
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - 180px);
+    max-height: none;
+    min-height: 0;
   }
 
+  /* Table: fixed viewport fraction so action bar is always visible below it */
   .table-wrap {
-    flex: 1;
+    flex: none;
     min-height: 120px;
-    max-height: calc(100vh - 240px);
+    max-height: 52vh;
+    max-height: 52dvh;
     overflow-x: auto;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -635,21 +658,32 @@ body {
     min-width: 4rem;
   }
 
-  /* Footer: smaller buttons so everything fits on one row */
+  /* Action bar: always fully visible, wraps onto two lines if needed */
   .results-actions {
+    flex-shrink: 0;
     gap: 0.4rem;
-    padding: 0.35rem 0.5rem;
+    padding: 0.5rem 0.5rem;
     flex-wrap: wrap;
   }
 
   .results-actions .btn-primary,
   .results-actions .btn-secondary {
-    padding: 0.35rem 0.5rem;
-    font-size: 0.7rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.75rem;
     white-space: nowrap;
+    text-align: center;
   }
 
   .results-actions .selected-job-info {
+    width: 100%;
     font-size: 0.7rem;
+  }
+
+  /* Results placeholder */
+  .results-placeholder {
+    flex: none;
+    min-height: 6rem;
   }
 }
