@@ -508,80 +508,7 @@
       return currentY + 5;
     }
 
-    // ----- Page 1: JOB CARD -----
-    doc.setFontSize(14);
-    doc.setFont(fontB, 'bold');
-    doc.text('JOB CARD', pageW / 2, y, { align: 'center' });
-    y += 8;
-
-    const h = json.header;
-    const headerStartY = y;
-    const qrGap = 3;
-    const qrWidth = 28;
-    const headerTableWidth = tableWidth - qrWidth - qrGap;
-    // Reserve right side for QR: right margin so autoTable only uses headerTableWidth
-    const headerRightMargin = pageW - margin - headerTableWidth;
-    doc.setFontSize(9);
-    doc.setFont(font, 'normal');
-    doc.autoTable({
-      startY: y,
-      body: [
-        ['Job No.', h.jobNo, 'SO No.', h.soNo, 'Job Date', h.jobDate, 'Est No.', h.estNo || '-'],
-        ['Del. Date', h.delDate, 'Quantity', h.quantity, 'Ref Product Master Code', (h.refProductMasterCode || '-'), 'SO Quantity', h.soQuantity]
-      ],
-      theme: 'grid',
-      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: headerRightMargin },
-      tableWidth: 'auto',
-      columnStyles: {
-        0: { fillColor: PDF_LAYOUT.fillColor },
-        2: { fillColor: PDF_LAYOUT.fillColor },
-        4: { fillColor: PDF_LAYOUT.fillColor },
-        6: { fillColor: PDF_LAYOUT.fillColor }
-      }
-    });
-    
-    // QR code in the right gap, height matches header table height
-    const headerTableHeight = doc.lastAutoTable.finalY - headerStartY;
-    if (json.qrCode) {
-      const qrDataURL = generateQRDataURL(json.qrCode, 128);
-      if (qrDataURL) {
-        const qrX = margin + headerTableWidth + qrGap;
-        const qrY = headerStartY;
-        doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrWidth, headerTableHeight);
-      }
-    }
-    
-    y = doc.lastAutoTable.finalY + sectionGap();
-
-    const ji = json.jobInfo;
-    const jobInfoLines = [
-      ['Job Name', ji.jobName, 'Sales Person', ji.salesPerson],
-      ['Client Name', ji.clientName, 'PO No', ji.poNo],
-      ['Consignee', ji.consignee, 'PO Date', ji.poDate],
-      ['Coordinator', ji.coordinator, 'Job Priority', ji.jobPriority],
-      ['Category', ji.category, 'Job Type', ji.jobType],
-      ['Content Name', ji.contentName, 'Plate Type', ji.plateType],
-      ['Job Size in MM', ji.jobSizeMm, 'Product Code', ji.productCode || '-'],
-      ['', '', 'PC Code', ji.pcCode],
-      ['', '', 'Ref. PC Code', ji.refPcCode],
-      ['Finished Format', ji.finishedFormat || '-', 'Ups', ji.ups],
-      ['Paper By', ji.paperBy, 'Actual Sheets', ji.actualSheets],
-      ['Process Waste', ji.processWaste, 'Make Ready Waste', ji.makeReadyWaste],
-      ['Total Req. Sheets', ji.totalReqSheets, '', '']
-    ];
-    doc.autoTable({
-      startY: y,
-      body: jobInfoLines.map(row => [row[0], row[1], row[2], row[3]]),
-      theme: 'grid',
-      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: margin },
-      tableWidth: tableWidth,
-      columnStyles: PDF_LAYOUT.col4
-    });
-    y = doc.lastAutoTable.finalY + sectionGap();
-
-    // ----- Gang Jobs (QR table) -----
+    // ----- Gang Jobs (QR table) — job-level, shown once before component blocks -----
     const gangJobs = json.gangJobs || [];
     if (gangJobs.length > 0) {
       doc.setFontSize(10);
@@ -607,19 +534,16 @@
         body: gangBody,
         theme: 'grid',
         headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', valign: 'middle', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
-        // Keep Gang Jobs header sizing consistent with PAPER DETAILS.
-        // QR cell sizing is handled below in didParseCell (body QR column only).
         styles: { fontSize: 7, halign: 'center', valign: 'middle', lineColor: PDF_LAYOUT.lineColor },
         margin: { left: margin, right: margin },
         tableWidth: tableWidth,
         columnStyles: {
-          0: { cellWidth: 55 }, // JobBookingNo
-          1: { cellWidth: 35 }, // Quantity
-          2: { cellWidth: 55 }, // GangUps
-          3: { cellWidth: tableWidth - 55 - 35 - 55 } // QR column
+          0: { cellWidth: 55 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 55 },
+          3: { cellWidth: tableWidth - 55 - 35 - 55 }
         },
         didParseCell: function(data) {
-          // Only force QR cell height in the BODY column; don't affect header row height.
           if (data.section === 'body' && data.column.index === gangQrColIndex) {
             data.cell.styles.cellPadding = 1;
             data.cell.styles.minCellHeight = 18;
@@ -667,119 +591,234 @@
       y = doc.lastAutoTable.finalY + sectionGap();
     }
 
-    doc.setFontSize(10);
-    doc.setFont(fontB, 'bold');
-    doc.text('PAPER DETAILS', pageW / 2, y, { align: 'center' });
-    y += 6;
-    doc.autoTable({
-      startY: y,
-      head: [['Item Code', 'Item Name', 'Paper Size', 'Total Sheets', 'Cut Size', 'Cuts', 'Final Qty', 'Item Weight']],
-      body: json.paperDetails.map(p => [p.itemCode, p.itemName, p.paperSize, p.totalSheets, p.cutSize, p.cuts, p.finalQty, p.itemWeight]),
-      theme: 'grid',
-      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
-      styles: { fontSize: 7, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: margin },
-      tableWidth: tableWidth
-    });
-    y = doc.lastAutoTable.finalY + sectionGap();
+    const baseHeader = json.header || {};
+    const packagingComponents = (json.components && json.components.length > 0)
+      ? json.components
+      : [{
+          partName: json.jobInfo?.contentName || 'Main',
+          jobCardContentNo: json.qrCode || baseHeader.jobNo,
+          qrCode: json.qrCode || baseHeader.jobNo,
+          header: {
+            ...baseHeader,
+            jobNo: json.qrCode || baseHeader.jobNo
+          },
+          jobInfo: json.jobInfo || {},
+          paperDetails: json.paperDetails || [],
+          printDetails: json.printDetails || {},
+          operationDetails: json.operationDetails || [],
+          allocatedMaterials: json.allocatedMaterials || []
+        }];
+    const showComponentHeadings = packagingComponents.length > 1;
+    const qrGap = 3;
+    const qrWidth = 28;
+    const headerTableWidth = tableWidth - qrWidth - qrGap;
+    const headerRightMargin = pageW - margin - headerTableWidth;
 
-    doc.text('PRINT DETAILS', pageW / 2, y, { align: 'center' });
-    y += 6;
-    const pd = json.printDetails;
-    doc.setFont(font, 'normal');
-    doc.setFontSize(8);
-    const printDetailsRows = [
-      ['Machine Name', pd.machineName || '-', 'Printing Style', pd.printingStyle || '-'],
-      ['Plate Qty', pd.plateQty || '-', pd.reverseTuckIn ? 'Reverse Tuck In' : '', pd.reverseTuckIn || ''],
-      ['Front Color', pd.frontColor || '-', 'Back Color', pd.backColor || '-'],
-      ['Sp. Front Color', pd.spFrontColor || '-', 'Sp. Back Color', pd.spBackColor || '-'],
-      ['Gripper (MM)', pd.gripperMm || '-', 'Online Coating', pd.onlineCoating || '-'],
-      ['Impressions', pd.impressions || '-', 'Process Size', pd.processSize || '-'],
-      ['S.O.I. Remark', pd.soiRemark || '-', 'Remark', pd.remark || '-'],
-      ['Special Instr.', pd.specialInstr || '-', 'Job Reference', pd.jobReference || '-']
-    ];
-    doc.autoTable({
-      startY: y,
-      body: printDetailsRows.map(row => [row[0], row[1], row[2], row[3]]),
-      theme: 'grid',
-      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: margin },
-      tableWidth: tableWidth,
-      columnStyles: PDF_LAYOUT.col4
-    });
-    y = doc.lastAutoTable.finalY + sectionGap();
-
-    // Build operation table body: backend already sorted (non-tool first, tool-related at bottom)
-    // Add tool row above each operation that has tool code
-    const opBody = [];
-    const numCols = 9;
-    json.operationDetails.forEach(op => {
-      // If operation has tool code, insert tool row first
-      if (op.toolCode || op.refNo) {
-        const toolParts = [
-          'ToolCode: ' + (op.toolCode || '-'),
-          'Ref No: ' + (op.refNo || '-'),
-          'Remark: ' + (op.toolRemark != null ? op.toolRemark : '-')
-        ];
-        opBody.push([{ content: toolParts.join('   '), colSpan: numCols }]);
-      }
-      // Then the operation row (use the SN from backend which is already sorted)
-      opBody.push([
-        op.sn,
-        op.operationName,
-        op.scheduleMachineName,
-        op.scheduleQty,
-        op.proMachineName,
-        op.proQty,
-        op.date || '-',
-        op.status,
-        op.remark || ''
-      ]);
-    });
-    y = drawSectionHeading('OPERATION DETAILS', y);
-    const opStartPage = doc.internal.getCurrentPageInfo().pageNumber;
-    doc.autoTable({
-      startY: y,
-      head: [['SN', 'Operation Name', 'Schedule Machine', 'Schedule Qty', 'Pro.Machine', 'Pro. Qty', 'Date', 'Status', 'Remark']],
-      body: opBody,
-      theme: 'grid',
-      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
-      styles: { fontSize: 7, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: margin },
-      tableWidth: tableWidth,
-      didDrawPage: function(data) {
-        // Repeat section heading on continuation pages
-        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-        if (currentPage > opStartPage) {
-          doc.setFont(fontB, 'bold');
-          doc.setFontSize(10);
-          doc.text('OPERATION DETAILS (Continued)', pageW / 2, 10, { align: 'center' });
+    function renderPackagingHeaderSection(compHeader, qrCode, startY) {
+      doc.setFontSize(14);
+      doc.setFont(fontB, 'bold');
+      doc.text('JOB CARD', pageW / 2, startY, { align: 'center' });
+      let nextY = startY + 8;
+      const headerStartY = nextY;
+      doc.setFontSize(9);
+      doc.setFont(font, 'normal');
+      doc.autoTable({
+        startY: nextY,
+        body: [
+          ['Job No.', compHeader.jobNo || '-', 'SO No.', compHeader.soNo || '-', 'Job Date', compHeader.jobDate || '-', 'Est No.', compHeader.estNo || '-'],
+          ['Del. Date', compHeader.delDate || '-', 'Quantity', compHeader.quantity || '-', 'Ref Product Master Code', compHeader.refProductMasterCode || '-', 'SO Quantity', compHeader.soQuantity || '-']
+        ],
+        theme: 'grid',
+        styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: headerRightMargin },
+        tableWidth: 'auto',
+        columnStyles: {
+          0: { fillColor: PDF_LAYOUT.fillColor },
+          2: { fillColor: PDF_LAYOUT.fillColor },
+          4: { fillColor: PDF_LAYOUT.fillColor },
+          6: { fillColor: PDF_LAYOUT.fillColor }
+        }
+      });
+      const headerTableHeight = doc.lastAutoTable.finalY - headerStartY;
+      if (qrCode) {
+        const qrDataURL = generateQRDataURL(qrCode, 128);
+        if (qrDataURL) {
+          const qrX = margin + headerTableWidth + qrGap;
+          const qrY = headerStartY;
+          doc.addImage(qrDataURL, 'PNG', qrX, qrY, qrWidth, headerTableHeight);
         }
       }
-    });
-    y = doc.lastAutoTable.finalY + sectionGap();
+      return doc.lastAutoTable.finalY + sectionGap();
+    }
 
-    y = drawSectionHeading('ALLOCATED MATERIAL DETAILS', y);
-    const allocStartPage = doc.internal.getCurrentPageInfo().pageNumber;
-    doc.autoTable({
-      startY: y,
-      head: [['Operation Name', 'Material', 'Qty', 'Unit']],
-      body: json.allocatedMaterials.map(m => [m.operationName, m.material, m.qty, m.unit]),
-      theme: 'grid',
-      headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
-      styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
-      margin: { left: margin, right: margin },
-      tableWidth: tableWidth,
-      didDrawPage: function(data) {
-        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-        if (currentPage > allocStartPage) {
-          doc.setFont(fontB, 'bold');
-          doc.setFontSize(10);
-          doc.text('ALLOCATED MATERIAL DETAILS (Continued)', pageW / 2, 10, { align: 'center' });
+    function renderPackagingJobInfoTable(ji, startY) {
+      const jobInfoLines = [
+        ['Job Name', ji.jobName, 'Sales Person', ji.salesPerson],
+        ['Client Name', ji.clientName, 'PO No', ji.poNo],
+        ['Consignee', ji.consignee, 'PO Date', ji.poDate],
+        ['Coordinator', ji.coordinator, 'Job Priority', ji.jobPriority],
+        ['Category', ji.category, 'Job Type', ji.jobType],
+        ['Content Name', ji.contentName, 'Plate Type', ji.plateType],
+        ['Job Size in MM', ji.jobSizeMm, 'Product Code', ji.productCode || '-'],
+        ['', '', 'PC Code', ji.pcCode],
+        ['', '', 'Ref. PC Code', ji.refPcCode],
+        ['Finished Format', ji.finishedFormat || '-', 'Ups', ji.ups],
+        ['Paper By', ji.paperBy, 'Actual Sheets', ji.actualSheets],
+        ['Process Waste', ji.processWaste, 'Make Ready Waste', ji.makeReadyWaste],
+        ['Total Req. Sheets', ji.totalReqSheets, '', '']
+      ];
+      doc.autoTable({
+        startY: startY,
+        body: jobInfoLines.map(row => [row[0], row[1], row[2], row[3]]),
+        theme: 'grid',
+        styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        columnStyles: PDF_LAYOUT.col4
+      });
+      return doc.lastAutoTable.finalY + sectionGap();
+    }
+
+    function renderPackagingPrintDetails(pd, startY) {
+      doc.text('PRINT DETAILS', pageW / 2, startY, { align: 'center' });
+      let nextY = startY + 6;
+      doc.setFont(font, 'normal');
+      doc.setFontSize(8);
+      const printDetailsRows = [
+        ['Machine Name', pd.machineName || '-', 'Printing Style', pd.printingStyle || '-'],
+        ['Plate Qty', pd.plateQty || '-', pd.reverseTuckIn ? 'Reverse Tuck In' : '', pd.reverseTuckIn || ''],
+        ['Front Color', pd.frontColor || '-', 'Back Color', pd.backColor || '-'],
+        ['Sp. Front Color', pd.spFrontColor || '-', 'Sp. Back Color', pd.spBackColor || '-'],
+        ['Gripper (MM)', pd.gripperMm || '-', 'Online Coating', pd.onlineCoating || '-'],
+        ['Impressions', pd.impressions || '-', 'Process Size', pd.processSize || '-'],
+        ['S.O.I. Remark', pd.soiRemark || '-', 'Remark', pd.remark || '-'],
+        ['Special Instr.', pd.specialInstr || '-', 'Job Reference', pd.jobReference || '-']
+      ];
+      doc.autoTable({
+        startY: nextY,
+        body: printDetailsRows.map(row => [row[0], row[1], row[2], row[3]]),
+        theme: 'grid',
+        styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        columnStyles: PDF_LAYOUT.col4
+      });
+      return doc.lastAutoTable.finalY + sectionGap();
+    }
+
+    function renderPackagingOperationDetails(operationDetails, sectionTitle, startY) {
+      const opBody = [];
+      const numCols = 9;
+      (operationDetails || []).forEach(op => {
+        if (op.toolCode || op.refNo) {
+          const toolParts = [
+            'ToolCode: ' + (op.toolCode || '-'),
+            'Ref No: ' + (op.refNo || '-'),
+            'Remark: ' + (op.toolRemark != null ? op.toolRemark : '-')
+          ];
+          opBody.push([{ content: toolParts.join('   '), colSpan: numCols }]);
         }
+        opBody.push([
+          op.sn,
+          op.operationName,
+          op.scheduleMachineName,
+          op.scheduleQty,
+          op.proMachineName,
+          op.proQty,
+          op.date || '-',
+          op.status,
+          op.remark || ''
+        ]);
+      });
+      let nextY = drawSectionHeading(sectionTitle, startY);
+      const opStartPage = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.autoTable({
+        startY: nextY,
+        head: [['SN', 'Operation Name', 'Schedule Machine', 'Schedule Qty', 'Pro.Machine', 'Pro. Qty', 'Date', 'Status', 'Remark']],
+        body: opBody.length ? opBody : [['-', '-', '-', '-', '-', '-', '-', '-', '-']],
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 7, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        didDrawPage: function() {
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          if (currentPage > opStartPage) {
+            doc.setFont(fontB, 'bold');
+            doc.setFontSize(10);
+            doc.text(sectionTitle + ' (Continued)', pageW / 2, 10, { align: 'center' });
+          }
+        }
+      });
+      return doc.lastAutoTable.finalY + sectionGap();
+    }
+
+    for (let i = 0; i < packagingComponents.length; i++) {
+      const comp = packagingComponents[i];
+      if (i > 0) {
+        doc.addPage();
+        y = 10;
       }
-    });
-    y = doc.lastAutoTable.finalY + sectionGap();
+
+      const compHeader = comp.header || {
+        ...baseHeader,
+        jobNo: comp.jobCardContentNo || comp.qrCode || baseHeader.jobNo
+      };
+      const compQr = comp.qrCode || comp.jobCardContentNo || compHeader.jobNo;
+      y = renderPackagingHeaderSection(compHeader, compQr, y);
+
+      y = renderPackagingJobInfoTable(comp.jobInfo || {}, y);
+
+      doc.setFontSize(10);
+      doc.setFont(fontB, 'bold');
+      doc.text('PAPER DETAILS', pageW / 2, y, { align: 'center' });
+      y += 6;
+      const paperRows = (comp.paperDetails || []).map(p => [p.itemCode, p.itemName, p.paperSize, p.totalSheets, p.cutSize, p.cuts, p.finalQty, p.itemWeight]);
+      doc.autoTable({
+        startY: y,
+        head: [['Item Code', 'Item Name', 'Paper Size', 'Total Sheets', 'Cut Size', 'Cuts', 'Final Qty', 'Item Weight']],
+        body: paperRows.length ? paperRows : [['-', '-', '-', '-', '-', '-', '-', '-']],
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 7, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+
+      y = renderPackagingPrintDetails(comp.printDetails || {}, y);
+
+      const opSectionTitle = showComponentHeadings
+        ? 'OPERATION DETAILS - ' + (comp.partName || ('Component ' + (i + 1)))
+        : 'OPERATION DETAILS';
+      y = renderPackagingOperationDetails(comp.operationDetails || [], opSectionTitle, y);
+
+      const allocSectionTitle = showComponentHeadings
+        ? 'ALLOCATED MATERIAL DETAILS - ' + (comp.partName || ('Component ' + (i + 1)))
+        : 'ALLOCATED MATERIAL DETAILS';
+      y = drawSectionHeading(allocSectionTitle, y);
+      const allocStartPage = doc.internal.getCurrentPageInfo().pageNumber;
+      const allocRows = (comp.allocatedMaterials || []).map(m => [m.operationName, m.material, m.qty, m.unit]);
+      doc.autoTable({
+        startY: y,
+        head: [['Operation Name', 'Material', 'Qty', 'Unit']],
+        body: allocRows.length ? allocRows : [['-', '-', '-', '-']],
+        theme: 'grid',
+        headStyles: { fillColor: PDF_LAYOUT.fillColor, halign: 'center', textColor: PDF_LAYOUT.textColor, lineColor: PDF_LAYOUT.lineColor },
+        styles: { fontSize: 8, halign: 'center', lineColor: PDF_LAYOUT.lineColor },
+        margin: { left: margin, right: margin },
+        tableWidth: tableWidth,
+        didDrawPage: function() {
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          if (currentPage > allocStartPage) {
+            doc.setFont(fontB, 'bold');
+            doc.setFontSize(10);
+            doc.text(allocSectionTitle + ' (Continued)', pageW / 2, 10, { align: 'center' });
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + sectionGap();
+    }
 
     // ----- Batch Details (below Allocated Material Details, above Paper Flow) -----
     const batchDetails = json.batchDetails || [];
