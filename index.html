@@ -53,7 +53,16 @@
                 <option value="30">Last 30 days</option>
                 <option value="90">Last 90 days</option>
                 <option value="180">Last 180 days</option>
+                <option value="custom">Custom Range</option>
               </select>
+            </div>
+            <div class="filter-group custom-date-range hidden" id="customDateRangeGroup">
+              <label>Custom Date Range</label>
+              <div class="custom-date-range-inputs">
+                <input type="date" id="jobDateFrom" aria-label="From date">
+                <span class="custom-date-range-sep">to</span>
+                <input type="date" id="jobDateTo" aria-label="To date">
+              </div>
             </div>
             <div class="filter-group">
               <label for="jobStatus">Job Status</label>
@@ -83,6 +92,7 @@
             <colgroup id="resultsColgroup"></colgroup>
             <thead id="resultsThead"></thead>
             <tbody id="resultsTbody"></tbody>
+            <tfoot id="resultsTfoot"></tfoot>
           </table>
         </div>
         <div class="results-actions hidden" id="resultsActions">

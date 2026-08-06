@@ -61,6 +61,9 @@
   const clientNameInput = $('clientName');
   const salesPersonInput = $('salesPerson');
   const jobDateRangeSelect = $('jobDateRange');
+  const customDateRangeGroup = $('customDateRangeGroup');
+  const jobDateFromInput = $('jobDateFrom');
+  const jobDateToInput = $('jobDateTo');
   const jobStatusSelect = $('jobStatus');
   const databaseSelect = $('database');
   const resultsSection = $('resultsSection');
@@ -68,6 +71,7 @@
   const resultsTable = $('resultsTable');
   const resultsThead = $('resultsThead');
   const resultsTbody = $('resultsTbody');
+  const resultsTfoot = $('resultsTfoot');
   const resultsActions = $('resultsActions');
   const downloadJobCardBtn = $('downloadJobCardBtn');
   const downloadAndPrintBtn = $('downloadAndPrintBtn');
@@ -1407,10 +1411,10 @@
     { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
     { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
     { key: 'jobName', label: 'Job Name', width: 11, filter: 'text' },
-    { key: 'orderQuantity', label: 'Order Qty', width: 4 },
-    { key: 'gpnQty', label: 'GpnQty', width: 4 },
-    { key: 'deliveredQty', label: 'DeliveredQty', width: 5 },
-    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5 },
+    { key: 'orderQuantity', label: 'Order Qty', width: 4, sum: true },
+    { key: 'gpnQty', label: 'GpnQty', width: 4, sum: true },
+    { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true },
+    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5, sum: true },
     { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
     { key: 'printEnd', label: 'PrintEnd', width: 6 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
@@ -1531,10 +1535,51 @@
     searchTableFrameReady = true;
   }
 
+  function renderTotalsRow(results) {
+    if (!resultsTfoot) return;
+    resultsTfoot.innerHTML = '';
+    const sumCols = SEARCH_COLUMNS.filter(c => c.sum);
+    if (sumCols.length === 0 || !results || results.length === 0) return;
+
+    const sums = {};
+    sumCols.forEach(col => { sums[col.key] = 0; });
+    results.forEach(row => {
+      sumCols.forEach(col => {
+        const raw = getSearchRowValue(row, col.key);
+        const num = parseFloat(raw);
+        if (!Number.isNaN(num)) sums[col.key] += num;
+      });
+    });
+
+    const firstSumIdx = SEARCH_COLUMNS.findIndex(c => c.sum);
+    const tr = document.createElement('tr');
+    tr.className = 'results-tfoot-totals';
+    SEARCH_COLUMNS.forEach((col, idx) => {
+      if (idx < firstSumIdx) return; // merged into the label cell's colspan below
+      const cell = document.createElement('td');
+      if (col.sum) {
+        const total = sums[col.key];
+        cell.textContent = Number.isInteger(total) ? String(total) : total.toFixed(2);
+      } else {
+        cell.textContent = '';
+      }
+      tr.appendChild(cell);
+    });
+    if (firstSumIdx > 0) {
+      const labelCell = document.createElement('td');
+      labelCell.className = 'totals-label';
+      labelCell.textContent = 'Total';
+      labelCell.colSpan = firstSumIdx;
+      tr.insertBefore(labelCell, tr.firstChild);
+    }
+    resultsTfoot.appendChild(tr);
+  }
+
   function renderSearchResultsBody(results) {
     resultsTbody.innerHTML = '';
     if (!results || results.length === 0) {
       resultsTbody.innerHTML = '<tr><td colspan="' + SEARCH_COLUMNS.length + '">No rows found.</td></tr>';
+      if (resultsTfoot) resultsTfoot.innerHTML = '';
       return;
     }
     results.forEach((row, index) => {
@@ -1555,6 +1600,7 @@
       });
       resultsTbody.appendChild(tr);
     });
+    renderTotalsRow(results);
   }
 
   async function loadFilterOptions() {
@@ -1588,7 +1634,12 @@
     if (salesPersonID) params.set('salesPersonID', salesPersonID);
     if (jobStatus !== 'all') params.set('jobStatus', jobStatus);
     // Date range filter: send fromJobDate/toJobDate only when not "All"
-    if (rangeVal !== 'all') {
+    if (rangeVal === 'custom') {
+      const fromVal = jobDateFromInput ? jobDateFromInput.value : '';
+      const toVal = jobDateToInput ? jobDateToInput.value : '';
+      if (fromVal) params.set('fromJobDate', fromVal);
+      if (toVal) params.set('toJobDate', toVal);
+    } else if (rangeVal !== 'all') {
       const days = parseInt(rangeVal, 10);
       if (!Number.isNaN(days) && days > 0) {
         const now = new Date();
@@ -1715,6 +1766,9 @@
     if (clientNameInput) clientNameInput.value = '';
     if (salesPersonInput) salesPersonInput.value = '';
     if (jobDateRangeSelect) jobDateRangeSelect.value = 'all';
+    if (jobDateFromInput) jobDateFromInput.value = '';
+    if (jobDateToInput) jobDateToInput.value = '';
+    if (customDateRangeGroup) customDateRangeGroup.classList.add('hidden');
     if (jobStatusSelect) jobStatusSelect.value = 'all';
     headerTextFilters = {};
     if (resultsThead) {
@@ -1743,6 +1797,11 @@
     if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchJobs(); });
   });
   if (databaseSelect) databaseSelect.addEventListener('change', loadFilterOptions);
+  if (jobDateRangeSelect && customDateRangeGroup) {
+    jobDateRangeSelect.addEventListener('change', () => {
+      customDateRangeGroup.classList.toggle('hidden', jobDateRangeSelect.value !== 'custom');
+    });
+  }
   loadFilterOptions();
   setupExcelDropdowns();
   if (downloadJobCardBtn) downloadJobCardBtn.addEventListener('click', onDownloadJobCardFromTable);

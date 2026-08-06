@@ -193,6 +193,38 @@ body {
   cursor: default;
 }
 
+.filter-group.custom-date-range.hidden {
+  display: none;
+}
+
+.custom-date-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.custom-date-range-inputs input[type="date"] {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.custom-date-range-inputs input[type="date"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.custom-date-range-sep {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .search-row {
   display: flex;
   align-items: center;
@@ -380,6 +412,21 @@ body {
   background: #1e3a5f;
   outline: 2px solid var(--blue);
   outline-offset: -1px;
+}
+
+.results-table tfoot tr.results-tfoot-totals th,
+.results-table tfoot tr.results-tfoot-totals td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: 0 -1px 0 var(--border-color);
+}
+
+.results-table tfoot .totals-label {
+  text-align: right;
 }
 
 .results-actions {
