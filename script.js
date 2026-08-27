@@ -1826,6 +1826,64 @@
     selectedJobInfo.textContent = '';
   }
 
+  function escapeCsvCell(value) {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+
+  function exportResultsToExcel() {
+    const rows = applyHeaderFilters(searchResults);
+    if (!rows || rows.length === 0) {
+      showMessage('No rows to export. Run a search first.', 'error');
+      return;
+    }
+
+    const headers = SEARCH_COLUMNS.map(col => col.label);
+    const csvRows = [headers.map(escapeCsvCell).join(',')];
+
+    rows.forEach(row => {
+      const cells = SEARCH_COLUMNS.map(col => escapeCsvCell(formatCellVal(getSearchRowValue(row, col.key))));
+      csvRows.push(cells.join(','));
+    });
+
+    // Totals row for qty columns (matches on-screen totals)
+    const sumCols = SEARCH_COLUMNS.filter(c => c.sum);
+    if (sumCols.length > 0) {
+      const sums = {};
+      sumCols.forEach(col => { sums[col.key] = 0; });
+      rows.forEach(row => {
+        sumCols.forEach(col => {
+          const num = parseFloat(getSearchRowValue(row, col.key));
+          if (!Number.isNaN(num)) sums[col.key] += num;
+        });
+      });
+      const totalCells = SEARCH_COLUMNS.map((col, idx) => {
+        if (idx === 0) return escapeCsvCell('Total');
+        if (col.sum) {
+          const total = sums[col.key];
+          return escapeCsvCell(Number.isInteger(total) ? String(total) : total.toFixed(2));
+        }
+        return '';
+      });
+      csvRows.push(totalCells.join(','));
+    }
+
+    const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const db = databaseSelect ? databaseSelect.value : 'KOL';
+    link.href = url;
+    link.download = 'JobCard_Search_' + db + '_' + stamp + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showMessage('Exported ' + rows.length + ' row(s) to Excel.', 'success', 2000);
+  }
+
   function clearAllFilters() {
     if (jobBookingNoInput) jobBookingNoInput.value = '';
     if (clientNameInput) clientNameInput.value = '';
@@ -1879,6 +1937,8 @@
   if (downloadJobCardBtn) downloadJobCardBtn.addEventListener('click', onDownloadJobCardFromTable);
   if (downloadAndPrintBtn) downloadAndPrintBtn.addEventListener('click', onDownloadAndPrint);
   if (unselectRowBtn) unselectRowBtn.addEventListener('click', unselectRow);
+  const exportExcelBtn = $('exportExcelBtn');
+  if (exportExcelBtn) exportExcelBtn.addEventListener('click', exportResultsToExcel);
   downloadBtn.addEventListener('click', downloadPdf);
   viewJsonBtn.addEventListener('click', toggleJsonPreview);
 })();
