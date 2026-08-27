@@ -375,6 +375,26 @@ body {
   border-color: var(--primary-color);
 }
 
+.results-table th .header-minmax-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.results-table th .header-minmax-input {
+  padding: 0.2rem 0.3rem;
+  font-size: 0.7rem;
+  /* hide spinner buttons so narrow qty columns stay usable */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.results-table th .header-minmax-input::-webkit-outer-spin-button,
+.results-table th .header-minmax-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .results-table thead th {
   background: var(--bg-primary);
   font-weight: 600;

@@ -10,7 +10,12 @@
   // ---------------------------------------------------------------------------
   // Config: backend API for job card data (procedure ProductionWorkOrderPrint for packaging header)
   // ---------------------------------------------------------------------------
-  const isLocalHost = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
+  // file:// (double-click / start index.html) has an empty hostname — treat as local.
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'file:' ||
+      !window.location.hostname ||
+      /localhost|127\.0\.0\.1|^::1$/i.test(window.location.hostname));
   const CONFIG = {
     apiBaseUrl: isLocalHost ? 'http://localhost:3001/api' : 'https://cdcapi.onrender.com/api',
     useApi: true // when true and apiBaseUrl set, search calls API; 00001/00002 still use sample data
@@ -1411,10 +1416,10 @@
     { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
     { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
     { key: 'jobName', label: 'Job Name', width: 11, filter: 'text' },
-    { key: 'orderQuantity', label: 'Order Qty', width: 4, sum: true },
-    { key: 'gpnQty', label: 'GpnQty', width: 4, sum: true },
-    { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true },
-    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5, sum: true },
+    { key: 'orderQuantity', label: 'Order Qty', width: 5, sum: true, filter: 'minmax' },
+    { key: 'gpnQty', label: 'GpnQty', width: 5, sum: true, filter: 'minmax' },
+    { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true, filter: 'minmax' },
+    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5, sum: true, filter: 'minmax' },
     { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
     { key: 'printEnd', label: 'PrintEnd', width: 6 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
@@ -1428,7 +1433,7 @@
   ];
 
   /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
-  const SEARCH_TABLE_BUILD_ID = 'v2-status-reason';
+  const SEARCH_TABLE_BUILD_ID = 'v3-qty-minmax';
   let builtSearchTableId = '';
 
   function getSearchRowValue(row, key) {
@@ -1444,6 +1449,7 @@
 
   let searchTableFrameReady = false;
   let headerTextFilters = {};
+  let headerMinMaxFilters = {};
   let headerFilterTimer = null;
 
   function formatCellVal(val) {
@@ -1462,15 +1468,50 @@
     return String(val == null ? '' : val).trim().toLowerCase();
   }
 
-  function applyHeaderTextFilters(rows) {
-    const active = Object.entries(headerTextFilters || {}).filter(([, v]) => normalizeFilterStr(v) !== '');
-    if (active.length === 0) return rows;
+  function parseFilterNumber(val) {
+    if (val == null || String(val).trim() === '') return null;
+    const num = parseFloat(String(val).replace(/,/g, '').trim());
+    return Number.isFinite(num) ? num : null;
+  }
+
+  function scheduleHeaderFilterRefresh() {
+    if (headerFilterTimer) clearTimeout(headerFilterTimer);
+    headerFilterTimer = setTimeout(() => {
+      selectedSearchRow = null;
+      resultsActions.classList.add('hidden');
+      selectedJobInfo.textContent = '';
+      renderSearchResultsBody(applyHeaderFilters(searchResults));
+    }, 120);
+  }
+
+  function applyHeaderFilters(rows) {
+    const activeText = Object.entries(headerTextFilters || {}).filter(([, v]) => normalizeFilterStr(v) !== '');
+    const activeMinMax = Object.entries(headerMinMaxFilters || {}).filter(([, range]) => {
+      if (!range) return false;
+      return String(range.min || '').trim() !== '' || String(range.max || '').trim() !== '';
+    });
+    if (activeText.length === 0 && activeMinMax.length === 0) return rows;
     return (rows || []).filter(row => {
-      return active.every(([key, expected]) => {
+      const textOk = activeText.every(([key, expected]) => {
         const actual = normalizeFilterStr(formatCellVal(getSearchRowValue(row, key)));
         return actual.includes(normalizeFilterStr(expected));
       });
+      if (!textOk) return false;
+      return activeMinMax.every(([key, range]) => {
+        const num = parseFilterNumber(getSearchRowValue(row, key));
+        if (num == null) return false;
+        const min = parseFilterNumber(range.min);
+        const max = parseFilterNumber(range.max);
+        if (min != null && num < min) return false;
+        if (max != null && num > max) return false;
+        return true;
+      });
     });
+  }
+
+  // Keep old name as alias for any leftover callers
+  function applyHeaderTextFilters(rows) {
+    return applyHeaderFilters(rows);
   }
 
   function ensureSearchTableFrame() {
@@ -1498,9 +1539,9 @@
     });
     resultsThead.appendChild(theadTr);
 
-    // Filter row (text columns only)
-    const anyTextFilters = SEARCH_COLUMNS.some(c => c.filter === 'text');
-    if (anyTextFilters) {
+    // Filter row (text + min/max qty columns)
+    const anyFilters = SEARCH_COLUMNS.some(c => c.filter === 'text' || c.filter === 'minmax');
+    if (anyFilters) {
       const filterTr = document.createElement('tr');
       filterTr.className = 'results-thead-filters';
       SEARCH_COLUMNS.forEach(col => {
@@ -1514,18 +1555,42 @@
           input.dataset.key = col.key;
           input.value = headerTextFilters[col.key] || '';
           input.addEventListener('input', () => {
-            const k = input.dataset.key;
-            headerTextFilters[k] = input.value || '';
-            if (headerFilterTimer) clearTimeout(headerFilterTimer);
-            headerFilterTimer = setTimeout(() => {
-              // reset selection when filtering changes
-              selectedSearchRow = null;
-              resultsActions.classList.add('hidden');
-              selectedJobInfo.textContent = '';
-              renderSearchResultsBody(applyHeaderTextFilters(searchResults));
-            }, 120);
+            headerTextFilters[col.key] = input.value || '';
+            scheduleHeaderFilterRefresh();
           });
           th.appendChild(input);
+        } else if (col.filter === 'minmax') {
+          const wrap = document.createElement('div');
+          wrap.className = 'header-minmax-filter';
+          const saved = headerMinMaxFilters[col.key] || { min: '', max: '' };
+          const minInput = document.createElement('input');
+          minInput.type = 'number';
+          minInput.className = 'header-filter-input header-minmax-input';
+          minInput.placeholder = 'Min';
+          minInput.autocomplete = 'off';
+          minInput.dataset.key = col.key;
+          minInput.dataset.bound = 'min';
+          minInput.value = saved.min || '';
+          const maxInput = document.createElement('input');
+          maxInput.type = 'number';
+          maxInput.className = 'header-filter-input header-minmax-input';
+          maxInput.placeholder = 'Max';
+          maxInput.autocomplete = 'off';
+          maxInput.dataset.key = col.key;
+          maxInput.dataset.bound = 'max';
+          maxInput.value = saved.max || '';
+          const onMinMaxInput = () => {
+            headerMinMaxFilters[col.key] = {
+              min: minInput.value || '',
+              max: maxInput.value || ''
+            };
+            scheduleHeaderFilterRefresh();
+          };
+          minInput.addEventListener('input', onMinMaxInput);
+          maxInput.addEventListener('input', onMinMaxInput);
+          wrap.appendChild(minInput);
+          wrap.appendChild(maxInput);
+          th.appendChild(wrap);
         }
         filterTr.appendChild(th);
       });
@@ -1771,11 +1836,18 @@
     if (customDateRangeGroup) customDateRangeGroup.classList.add('hidden');
     if (jobStatusSelect) jobStatusSelect.value = 'all';
     headerTextFilters = {};
+    headerMinMaxFilters = {};
     if (resultsThead) {
       resultsThead.querySelectorAll('input.header-filter-input').forEach(inp => { inp.value = ''; });
     }
     if (clientNameListBox) clientNameListBox.classList.remove('open');
     if (salesPersonListBox) salesPersonListBox.classList.remove('open');
+    if (searchResults && searchResults.length) {
+      selectedSearchRow = null;
+      resultsActions.classList.add('hidden');
+      selectedJobInfo.textContent = '';
+      renderSearchResultsBody(applyHeaderFilters(searchResults));
+    }
     hideMessage();
   }
 
