@@ -1420,6 +1420,7 @@
     { key: 'gpnQty', label: 'GpnQty', width: 5, sum: true, filter: 'minmax' },
     { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true, filter: 'minmax' },
     { key: 'bindingProdQty', label: 'BindingProdQty', width: 5, sum: true, filter: 'minmax' },
+    { key: 'printCompletionPct', label: 'PrintCompletion%', width: 5, filter: 'minmax' },
     { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
     { key: 'printEnd', label: 'PrintEnd', width: 6 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
@@ -1433,7 +1434,7 @@
   ];
 
   /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
-  const SEARCH_TABLE_BUILD_ID = 'v3-qty-minmax';
+  const SEARCH_TABLE_BUILD_ID = 'v4-print-completion';
   let builtSearchTableId = '';
 
   function getSearchRowValue(row, key) {
