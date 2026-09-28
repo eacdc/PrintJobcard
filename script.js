@@ -1412,29 +1412,29 @@
   }
 
   const SEARCH_COLUMNS = [
-    { key: 'jobBookingNo', label: 'Job Booking No', minWidth: 110, filter: 'text' },
-    { key: 'clientName', label: 'Client Name', minWidth: 140, filter: 'text' },
-    { key: 'salesPersonName', label: 'Sales Person', minWidth: 110, filter: 'text' },
-    { key: 'jobName', label: 'Job Name', minWidth: 160, filter: 'text' },
-    { key: 'orderQuantity', label: 'Order Qty', minWidth: 90, sum: true, filter: 'minmax' },
-    { key: 'gpnQty', label: 'GpnQty', minWidth: 90, sum: true, filter: 'minmax' },
-    { key: 'deliveredQty', label: 'DeliveredQty', minWidth: 100, sum: true, filter: 'minmax' },
-    { key: 'bindingProdQty', label: 'BindingProdQty', minWidth: 120, sum: true, filter: 'minmax' },
-    { key: 'printCompletionPct', label: 'PrintCompletion%', minWidth: 130, filter: 'minmax' },
-    { key: 'printStatus', label: 'PrintStatus', minWidth: 100, filter: 'text' },
-    { key: 'printEnd', label: 'PrintEnd', minWidth: 100 },
-    { key: 'deliveryDate', label: 'Delivery Date', minWidth: 100 },
-    { key: 'productCode', label: 'Product Code', minWidth: 100, filter: 'text' },
-    { key: 'refProductMasterCode', label: 'Ref Product Code', minWidth: 120, filter: 'text' },
-    { key: 'poNo', label: 'PO No', minWidth: 90, filter: 'text' },
-    { key: 'poDate', label: 'PO Date', minWidth: 90 },
-    { key: 'jobBookingDate', label: 'Job Date', minWidth: 90 },
-    { key: 'status', label: 'Status', minWidth: 90, filter: 'text' },
-    { key: 'statusReason', label: 'Status reason', minWidth: 140, filter: 'text' }
+    { key: 'jobBookingNo', label: 'Job Booking No', width: 7, filter: 'text' },
+    { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
+    { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
+    { key: 'jobName', label: 'Job Name', width: 9, filter: 'text' },
+    { key: 'orderQuantity', label: 'Order Qty', width: 4.5, sum: true, filter: 'minmax' },
+    { key: 'gpnQty', label: 'GpnQty', width: 4.5, sum: true, filter: 'minmax' },
+    { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true, filter: 'minmax' },
+    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5.5, sum: true, filter: 'minmax' },
+    { key: 'printCompletionPct', label: 'PrintCompletion%', width: 5.5, filter: 'minmax' },
+    { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
+    { key: 'printEnd', label: 'PrintEnd', width: 5 },
+    { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
+    { key: 'productCode', label: 'Product Code', width: 5, filter: 'text' },
+    { key: 'refProductMasterCode', label: 'Ref Product Code', width: 5.5, filter: 'text' },
+    { key: 'poNo', label: 'PO No', width: 4.5, filter: 'text' },
+    { key: 'poDate', label: 'PO Date', width: 4.5 },
+    { key: 'jobBookingDate', label: 'Job Date', width: 4.5 },
+    { key: 'status', label: 'Status', width: 4.5, filter: 'text' },
+    { key: 'statusReason', label: 'Status reason', width: 6.5, filter: 'text' }
   ];
 
   /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
-  const SEARCH_TABLE_BUILD_ID = 'v5-full-headers';
+  const SEARCH_TABLE_BUILD_ID = 'v6-wrap-headers';
   let builtSearchTableId = '';
 
   function getSearchRowValue(row, key) {
@@ -1526,6 +1526,14 @@
     return applyHeaderFilters(rows);
   }
 
+  function syncStickyHeaderOffset() {
+    if (!resultsTable || !resultsThead) return;
+    const labelRow = resultsThead.querySelector('tr.results-thead-labels');
+    if (!labelRow) return;
+    const h = Math.ceil(labelRow.getBoundingClientRect().height);
+    resultsTable.style.setProperty('--results-thead-labels-h', h + 'px');
+  }
+
   function ensureSearchTableFrame() {
     if (builtSearchTableId === SEARCH_TABLE_BUILD_ID && searchTableFrameReady) return;
     builtSearchTableId = SEARCH_TABLE_BUILD_ID;
@@ -1534,7 +1542,7 @@
       resultsColgroup.innerHTML = '';
       SEARCH_COLUMNS.forEach(col => {
         const colEl = document.createElement('col');
-        if (col.minWidth) colEl.style.minWidth = col.minWidth + 'px';
+        colEl.style.width = (col.width || 100 / SEARCH_COLUMNS.length) + '%';
         resultsColgroup.appendChild(colEl);
       });
     }
@@ -1547,7 +1555,6 @@
     SEARCH_COLUMNS.forEach(col => {
       const th = document.createElement('th');
       th.textContent = col.label;
-      if (col.minWidth) th.style.minWidth = col.minWidth + 'px';
       theadTr.appendChild(th);
     });
     resultsThead.appendChild(theadTr);
@@ -1611,6 +1618,7 @@
     }
 
     searchTableFrameReady = true;
+    requestAnimationFrame(syncStickyHeaderOffset);
   }
 
   function renderTotalsRow(results) {
@@ -1756,6 +1764,7 @@
       renderSearchResultsBody(applyHeaderTextFilters(searchResults));
       resultsSection.classList.remove('hidden');
       if (resultsPlaceholder) resultsPlaceholder.classList.add('hidden');
+      requestAnimationFrame(syncStickyHeaderOffset);
       if (searchResults.length === 0) showMessage('No jobs found. Try different filters.', '');
     } catch (e) {
       showMessage(e.message || 'Search failed.', 'error');
@@ -1947,6 +1956,9 @@
   }
   loadFilterOptions();
   setupExcelDropdowns();
+  window.addEventListener('resize', () => {
+    if (searchTableFrameReady) syncStickyHeaderOffset();
+  });
   if (downloadJobCardBtn) downloadJobCardBtn.addEventListener('click', onDownloadJobCardFromTable);
   if (downloadAndPrintBtn) downloadAndPrintBtn.addEventListener('click', onDownloadAndPrint);
   if (unselectRowBtn) unselectRowBtn.addEventListener('click', unselectRow);
