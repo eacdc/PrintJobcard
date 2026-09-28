@@ -1412,29 +1412,29 @@
   }
 
   const SEARCH_COLUMNS = [
-    { key: 'jobBookingNo', label: 'Job Booking No', width: 8, filter: 'text' },
-    { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
-    { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
-    { key: 'jobName', label: 'Job Name', width: 11, filter: 'text' },
-    { key: 'orderQuantity', label: 'Order Qty', width: 5, sum: true, filter: 'minmax' },
-    { key: 'gpnQty', label: 'GpnQty', width: 5, sum: true, filter: 'minmax' },
-    { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true, filter: 'minmax' },
-    { key: 'bindingProdQty', label: 'BindingProdQty', width: 5, sum: true, filter: 'minmax' },
-    { key: 'printCompletionPct', label: 'PrintCompletion%', width: 5, filter: 'minmax' },
-    { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
-    { key: 'printEnd', label: 'PrintEnd', width: 6 },
-    { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
-    { key: 'productCode', label: 'Product Code', width: 5, filter: 'text' },
-    { key: 'refProductMasterCode', label: 'Ref Product Code', width: 5, filter: 'text' },
-    { key: 'poNo', label: 'PO No', width: 5, filter: 'text' },
-    { key: 'poDate', label: 'PO Date', width: 5 },
-    { key: 'jobBookingDate', label: 'Job Date', width: 5 },
-    { key: 'status', label: 'Status', width: 5, filter: 'text' },
-    { key: 'statusReason', label: 'Status reason', width: 9, filter: 'text' }
+    { key: 'jobBookingNo', label: 'Job Booking No', minWidth: 110, filter: 'text' },
+    { key: 'clientName', label: 'Client Name', minWidth: 140, filter: 'text' },
+    { key: 'salesPersonName', label: 'Sales Person', minWidth: 110, filter: 'text' },
+    { key: 'jobName', label: 'Job Name', minWidth: 160, filter: 'text' },
+    { key: 'orderQuantity', label: 'Order Qty', minWidth: 90, sum: true, filter: 'minmax' },
+    { key: 'gpnQty', label: 'GpnQty', minWidth: 90, sum: true, filter: 'minmax' },
+    { key: 'deliveredQty', label: 'DeliveredQty', minWidth: 100, sum: true, filter: 'minmax' },
+    { key: 'bindingProdQty', label: 'BindingProdQty', minWidth: 120, sum: true, filter: 'minmax' },
+    { key: 'printCompletionPct', label: 'PrintCompletion%', minWidth: 130, filter: 'minmax' },
+    { key: 'printStatus', label: 'PrintStatus', minWidth: 100, filter: 'text' },
+    { key: 'printEnd', label: 'PrintEnd', minWidth: 100 },
+    { key: 'deliveryDate', label: 'Delivery Date', minWidth: 100 },
+    { key: 'productCode', label: 'Product Code', minWidth: 100, filter: 'text' },
+    { key: 'refProductMasterCode', label: 'Ref Product Code', minWidth: 120, filter: 'text' },
+    { key: 'poNo', label: 'PO No', minWidth: 90, filter: 'text' },
+    { key: 'poDate', label: 'PO Date', minWidth: 90 },
+    { key: 'jobBookingDate', label: 'Job Date', minWidth: 90 },
+    { key: 'status', label: 'Status', minWidth: 90, filter: 'text' },
+    { key: 'statusReason', label: 'Status reason', minWidth: 140, filter: 'text' }
   ];
 
   /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
-  const SEARCH_TABLE_BUILD_ID = 'v4-print-completion';
+  const SEARCH_TABLE_BUILD_ID = 'v5-full-headers';
   let builtSearchTableId = '';
 
   function getSearchRowValue(row, key) {
@@ -1463,6 +1463,17 @@
     const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
     if (iso) return iso[3] + '-' + iso[2] + '-' + iso[1];
     return s;
+  }
+
+  function formatSearchCell(row, key) {
+    const raw = getSearchRowValue(row, key);
+    if (key === 'printCompletionPct') {
+      if (raw == null || raw === '') return '';
+      const s = String(raw).trim();
+      if (!s) return '';
+      return s.endsWith('%') ? s : s + '%';
+    }
+    return formatCellVal(raw);
   }
 
   function normalizeFilterStr(val) {
@@ -1523,7 +1534,7 @@
       resultsColgroup.innerHTML = '';
       SEARCH_COLUMNS.forEach(col => {
         const colEl = document.createElement('col');
-        colEl.style.width = (col.width || 100 / SEARCH_COLUMNS.length) + '%';
+        if (col.minWidth) colEl.style.minWidth = col.minWidth + 'px';
         resultsColgroup.appendChild(colEl);
       });
     }
@@ -1536,6 +1547,7 @@
     SEARCH_COLUMNS.forEach(col => {
       const th = document.createElement('th');
       th.textContent = col.label;
+      if (col.minWidth) th.style.minWidth = col.minWidth + 'px';
       theadTr.appendChild(th);
     });
     resultsThead.appendChild(theadTr);
@@ -1654,7 +1666,7 @@
       tr.classList.add('result-row');
       SEARCH_COLUMNS.forEach(col => {
         const td = document.createElement('td');
-        td.textContent = formatCellVal(getSearchRowValue(row, col.key));
+        td.textContent = formatSearchCell(row, col.key);
         tr.appendChild(td);
       });
       tr.addEventListener('click', function () {
@@ -1845,7 +1857,7 @@
     const csvRows = [headers.map(escapeCsvCell).join(',')];
 
     rows.forEach(row => {
-      const cells = SEARCH_COLUMNS.map(col => escapeCsvCell(formatCellVal(getSearchRowValue(row, col.key))));
+      const cells = SEARCH_COLUMNS.map(col => escapeCsvCell(formatSearchCell(row, col.key)));
       csvRows.push(cells.join(','));
     });
 

@@ -355,10 +355,11 @@ body {
 }
 
 .results-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .results-table th,
@@ -366,12 +367,18 @@ body {
   padding: 0.5rem 0.6rem;
   text-align: left;
   border: 1px solid var(--border-color);
+}
+
+.results-table td {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
 }
 
 .results-table th .header-filter-input {
   width: 100%;
+  min-width: 4.5rem;
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
@@ -389,6 +396,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 4.5rem;
 }
 
 .results-table th .header-minmax-input {
@@ -417,6 +425,9 @@ body {
   top: 0;
   z-index: 3;
   box-shadow: 0 1px 0 var(--border-color);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .results-table thead tr.results-thead-filters th {
