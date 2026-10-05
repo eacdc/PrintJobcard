@@ -1436,6 +1436,7 @@
   ];
 
   let printComponentNames = [];
+  let printComponentsExpanded = false; // collapsed by default: single "Component wise Comp %" column
   let SEARCH_COLUMNS = BASE_SEARCH_COLUMNS_BEFORE.concat(BASE_SEARCH_COLUMNS_AFTER);
   let builtSearchTableId = '';
   let freezeLeftOffsets = [];
@@ -1465,18 +1466,64 @@
   }
 
   function rebuildSearchColumns() {
-    const compCols = printComponentNames.map(name => ({
-      key: 'printComp:' + name,
-      label: name,
-      width: 5.5,
-      filter: 'minmax',
-      isPrintComponent: true
-    }));
-    SEARCH_COLUMNS = BASE_SEARCH_COLUMNS_BEFORE.concat(compCols, BASE_SEARCH_COLUMNS_AFTER);
+    let middle = [];
+    if (printComponentNames.length > 0) {
+      if (printComponentsExpanded) {
+        middle = printComponentNames.map((name, i) => ({
+          key: 'printComp:' + name,
+          label: name,
+          width: 6,
+          minWidthPx: 130,
+          filter: 'minmax',
+          isPrintComponent: true,
+          showExpandToggle: i === 0
+        }));
+      } else {
+        middle = [{
+          key: 'printByComponentCollapsed',
+          label: 'Component wise Comp %',
+          width: 8,
+          filter: 'text',
+          wrap: true,
+          isPrintComponentGroup: true,
+          showExpandToggle: true
+        }];
+      }
+    }
+    SEARCH_COLUMNS = BASE_SEARCH_COLUMNS_BEFORE.concat(middle, BASE_SEARCH_COLUMNS_AFTER);
   }
 
   function getSearchTableBuildId() {
-    return 'v8-comp-cols:' + printComponentNames.join('|');
+    return 'v9-comp:' + (printComponentsExpanded ? 'exp' : 'col') + ':' + printComponentNames.join('|');
+  }
+
+  function updateTableScrollMode() {
+    if (!resultsTable) return;
+    if (printComponentsExpanded && printComponentNames.length > 0) {
+      resultsTable.classList.add('components-expanded');
+      // Wide enough that each column can show full values; horizontal scroll after Order Qty
+      const minW = Math.max(1600, 700 + SEARCH_COLUMNS.length * 120);
+      resultsTable.style.minWidth = minW + 'px';
+    } else {
+      resultsTable.classList.remove('components-expanded');
+      resultsTable.style.minWidth = '1400px';
+    }
+  }
+
+  function togglePrintComponentsExpanded(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!printComponentNames.length) return;
+    printComponentsExpanded = !printComponentsExpanded;
+    rebuildSearchColumns();
+    builtSearchTableId = '';
+    searchTableFrameReady = false;
+    ensureSearchTableFrame();
+    renderSearchResultsBody(applyHeaderFilters(searchResults));
+    updateTableScrollMode();
+    requestAnimationFrame(syncFreezePane);
   }
 
   function enrichSearchResults(rows) {
@@ -1493,20 +1540,25 @@
       return Object.assign({}, row, { printComponents: map });
     });
     printComponentNames = order;
+    // Keep collapsed by default on each new search
+    printComponentsExpanded = false;
     rebuildSearchColumns();
     builtSearchTableId = '';
     searchTableFrameReady = false;
-    // Drop stale min/max filters for component columns that no longer exist
     Object.keys(headerMinMaxFilters || {}).forEach(key => {
       if (isPrintComponentKey(key) && !printComponentNames.includes(printComponentNameFromKey(key))) {
         delete headerMinMaxFilters[key];
       }
     });
+    if (headerTextFilters) delete headerTextFilters.printByComponentCollapsed;
     return enriched;
   }
 
   function getSearchRowValue(row, key) {
     if (!row) return '';
+    if (key === 'printByComponentCollapsed') {
+      return row.printByComponent != null ? row.printByComponent : '';
+    }
     if (isPrintComponentKey(key)) {
       const map = row.printComponents || {};
       const val = map[printComponentNameFromKey(key)];
@@ -1649,7 +1701,12 @@
       resultsColgroup.innerHTML = '';
       SEARCH_COLUMNS.forEach(col => {
         const colEl = document.createElement('col');
-        colEl.style.width = (col.width || 100 / SEARCH_COLUMNS.length) + '%';
+        if (col.minWidthPx) {
+          colEl.style.minWidth = col.minWidthPx + 'px';
+          colEl.style.width = col.minWidthPx + 'px';
+        } else {
+          colEl.style.width = (col.width || 100 / SEARCH_COLUMNS.length) + '%';
+        }
         resultsColgroup.appendChild(colEl);
       });
     }
@@ -1661,7 +1718,23 @@
     theadTr.className = 'results-thead-labels';
     SEARCH_COLUMNS.forEach((col, idx) => {
       const th = document.createElement('th');
-      th.textContent = col.label;
+      if (col.showExpandToggle) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'col-expand-toggle';
+        btn.textContent = printComponentsExpanded ? '−' : '+';
+        btn.title = printComponentsExpanded
+          ? 'Collapse component columns'
+          : 'Expand component columns';
+        btn.setAttribute('aria-expanded', printComponentsExpanded ? 'true' : 'false');
+        btn.addEventListener('click', togglePrintComponentsExpanded);
+        th.appendChild(btn);
+        th.appendChild(document.createTextNode(' '));
+      }
+      th.appendChild(document.createTextNode(col.label));
+      if (col.minWidthPx) th.style.minWidth = col.minWidthPx + 'px';
+      if (col.isPrintComponent) th.classList.add('col-print-comp');
+      if (col.isPrintComponentGroup) th.classList.add('col-print-comp-group');
       applyFreezeToCell(th, idx);
       theadTr.appendChild(th);
     });
@@ -1675,6 +1748,8 @@
       SEARCH_COLUMNS.forEach((col, idx) => {
         const th = document.createElement('th');
         applyFreezeToCell(th, idx);
+        if (col.isPrintComponent) th.classList.add('col-print-comp');
+        if (col.isPrintComponentGroup) th.classList.add('col-print-comp-group');
         if (col.filter === 'text') {
           const input = document.createElement('input');
           input.type = 'text';
@@ -1727,6 +1802,7 @@
     }
 
     searchTableFrameReady = true;
+    updateTableScrollMode();
     requestAnimationFrame(syncFreezePane);
   }
 
@@ -1746,30 +1822,23 @@
       });
     });
 
-    const firstSumIdx = SEARCH_COLUMNS.findIndex(c => c.sum);
     const tr = document.createElement('tr');
     tr.className = 'results-tfoot-totals';
+    // One cell per column (no colspan) so horizontal freeze stays aligned through Order Qty
     SEARCH_COLUMNS.forEach((col, idx) => {
-      if (idx < firstSumIdx) return; // merged into the label cell's colspan below
       const cell = document.createElement('td');
       if (col.sum) {
         const total = sums[col.key];
         cell.textContent = Number.isInteger(total) ? String(total) : total.toFixed(2);
+      } else if (idx === 0) {
+        cell.textContent = 'Total';
+        cell.classList.add('totals-label');
       } else {
         cell.textContent = '';
       }
       applyFreezeToCell(cell, idx);
       tr.appendChild(cell);
     });
-    if (firstSumIdx > 0) {
-      const labelCell = document.createElement('td');
-      labelCell.className = 'totals-label col-frozen';
-      labelCell.textContent = 'Total';
-      labelCell.colSpan = firstSumIdx;
-      labelCell.dataset.colIndex = '0';
-      labelCell.style.left = '0px';
-      tr.insertBefore(labelCell, tr.firstChild);
-    }
     resultsTfoot.appendChild(tr);
   }
 
@@ -1788,6 +1857,8 @@
         const td = document.createElement('td');
         td.textContent = formatSearchCell(row, col.key);
         if (col.wrap) td.classList.add('col-wrap');
+        if (col.isPrintComponent) td.classList.add('col-print-comp');
+        if (col.isPrintComponentGroup) td.classList.add('col-print-comp-group');
         applyFreezeToCell(td, idx);
         tr.appendChild(td);
       });

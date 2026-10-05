@@ -356,11 +356,15 @@ body {
 
 .results-table {
   width: 100%;
-  min-width: 1800px;
+  min-width: 1400px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.8rem;
   table-layout: fixed;
+}
+
+.results-table.components-expanded {
+  table-layout: auto;
 }
 
 .results-table th,
@@ -382,6 +386,39 @@ body {
   overflow-wrap: anywhere;
   word-break: break-word;
   text-overflow: clip;
+}
+
+/* Expanded component % columns: full value visible, no ellipsis */
+.results-table.components-expanded td.col-print-comp,
+.results-table.components-expanded th.col-print-comp {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 130px;
+}
+
+.col-expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.15rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.col-expand-toggle:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .results-table th .header-filter-input {
@@ -519,6 +556,16 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   box-shadow: 0 -1px 0 var(--border-color);
+}
+
+/* Frozen total-row cells: stick both bottom (vertical) and left (horizontal freeze) */
+.results-table tfoot tr.results-tfoot-totals td.col-frozen {
+  z-index: 6;
+  background: var(--bg-secondary);
+}
+
+.results-table tfoot tr.results-tfoot-totals td.col-frozen-last {
+  box-shadow: 2px 0 0 var(--border-color), 0 -1px 0 var(--border-color);
 }
 
 .results-table tfoot .totals-label {
