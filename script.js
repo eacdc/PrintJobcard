@@ -1411,16 +1411,18 @@
     }
   }
 
-  const SEARCH_COLUMNS = [
-    { key: 'jobBookingNo', label: 'Job Booking No', width: 7, filter: 'text' },
-    { key: 'clientName', label: 'Client Name', width: 8, filter: 'text' },
-    { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text' },
-    { key: 'jobName', label: 'Job Name', width: 9, filter: 'text' },
-    { key: 'orderQuantity', label: 'Order Qty', width: 4.5, sum: true, filter: 'minmax' },
+  const BASE_SEARCH_COLUMNS_BEFORE = [
+    { key: 'jobBookingNo', label: 'Job Booking No', width: 7, filter: 'text', freeze: true },
+    { key: 'clientName', label: 'Client Name', width: 8, filter: 'text', freeze: true },
+    { key: 'salesPersonName', label: 'Sales Person', width: 6, filter: 'text', freeze: true },
+    { key: 'jobName', label: 'Job Name', width: 9, filter: 'text', freeze: true },
+    { key: 'orderQuantity', label: 'Order Qty', width: 4.5, sum: true, filter: 'minmax', freeze: true },
     { key: 'gpnQty', label: 'GpnQty', width: 4.5, sum: true, filter: 'minmax' },
     { key: 'deliveredQty', label: 'DeliveredQty', width: 5, sum: true, filter: 'minmax' },
     { key: 'bindingProdQty', label: 'BindingProdQty', width: 5.5, sum: true, filter: 'minmax' },
-    { key: 'printCompletionPct', label: 'PrintCompletion%', width: 5.5, filter: 'minmax' },
+    { key: 'printCompletionPct', label: 'PrintCompletion%', width: 5.5, filter: 'minmax' }
+  ];
+  const BASE_SEARCH_COLUMNS_AFTER = [
     { key: 'printStatus', label: 'PrintStatus', width: 5, filter: 'text' },
     { key: 'printEnd', label: 'PrintEnd', width: 5 },
     { key: 'deliveryDate', label: 'Delivery Date', width: 5 },
@@ -1433,12 +1435,83 @@
     { key: 'statusReason', label: 'Status reason', width: 6.5, filter: 'text' }
   ];
 
-  /** API returns `status` / `statusReason`; keep fallbacks for older payloads. */
-  const SEARCH_TABLE_BUILD_ID = 'v6-wrap-headers';
+  let printComponentNames = [];
+  let SEARCH_COLUMNS = BASE_SEARCH_COLUMNS_BEFORE.concat(BASE_SEARCH_COLUMNS_AFTER);
   let builtSearchTableId = '';
+  let freezeLeftOffsets = [];
+
+  function isPrintComponentKey(key) {
+    return typeof key === 'string' && key.indexOf('printComp:') === 0;
+  }
+
+  function printComponentNameFromKey(key) {
+    return isPrintComponentKey(key) ? key.slice('printComp:'.length) : '';
+  }
+
+  /** Parse "4 Col Pgs 97%, Book Cover 98%" → { "4 Col Pgs": 97, "Book Cover": 98 } */
+  function parsePrintByComponent(str) {
+    const map = {};
+    if (str == null || String(str).trim() === '') return map;
+    String(str).split(',').forEach(part => {
+      const s = part.trim();
+      if (!s) return;
+      const m = s.match(/^(.+?)\s+(\d+(?:\.\d+)?%|-)$/);
+      if (!m) return;
+      const name = m[1].trim();
+      if (!name) return;
+      map[name] = m[2] === '-' ? null : parseFloat(m[2]);
+    });
+    return map;
+  }
+
+  function rebuildSearchColumns() {
+    const compCols = printComponentNames.map(name => ({
+      key: 'printComp:' + name,
+      label: name,
+      width: 5.5,
+      filter: 'minmax',
+      isPrintComponent: true
+    }));
+    SEARCH_COLUMNS = BASE_SEARCH_COLUMNS_BEFORE.concat(compCols, BASE_SEARCH_COLUMNS_AFTER);
+  }
+
+  function getSearchTableBuildId() {
+    return 'v8-comp-cols:' + printComponentNames.join('|');
+  }
+
+  function enrichSearchResults(rows) {
+    const order = [];
+    const seen = new Set();
+    const enriched = (rows || []).map(row => {
+      const map = parsePrintByComponent(row.printByComponent);
+      Object.keys(map).forEach(name => {
+        if (!seen.has(name)) {
+          seen.add(name);
+          order.push(name);
+        }
+      });
+      return Object.assign({}, row, { printComponents: map });
+    });
+    printComponentNames = order;
+    rebuildSearchColumns();
+    builtSearchTableId = '';
+    searchTableFrameReady = false;
+    // Drop stale min/max filters for component columns that no longer exist
+    Object.keys(headerMinMaxFilters || {}).forEach(key => {
+      if (isPrintComponentKey(key) && !printComponentNames.includes(printComponentNameFromKey(key))) {
+        delete headerMinMaxFilters[key];
+      }
+    });
+    return enriched;
+  }
 
   function getSearchRowValue(row, key) {
     if (!row) return '';
+    if (isPrintComponentKey(key)) {
+      const map = row.printComponents || {};
+      const val = map[printComponentNameFromKey(key)];
+      return val == null ? '' : val;
+    }
     if (key === 'status') return row.status != null && row.status !== '' ? row.status : (row.jobStatus != null ? row.jobStatus : '');
     if (key === 'statusReason') {
       return row.statusReason != null && row.statusReason !== ''
@@ -1467,7 +1540,7 @@
 
   function formatSearchCell(row, key) {
     const raw = getSearchRowValue(row, key);
-    if (key === 'printCompletionPct') {
+    if (key === 'printCompletionPct' || isPrintComponentKey(key)) {
       if (raw == null || raw === '') return '';
       const s = String(raw).trim();
       if (!s) return '';
@@ -1534,9 +1607,43 @@
     resultsTable.style.setProperty('--results-thead-labels-h', h + 'px');
   }
 
+  function syncFreezePane() {
+    if (!resultsThead) return;
+    const labelCells = resultsThead.querySelectorAll('tr.results-thead-labels th');
+    freezeLeftOffsets = SEARCH_COLUMNS.map(() => 0);
+    let left = 0;
+    SEARCH_COLUMNS.forEach((col, idx) => {
+      freezeLeftOffsets[idx] = left;
+      if (col.freeze && labelCells[idx]) {
+        left += labelCells[idx].getBoundingClientRect().width;
+      }
+    });
+    document.querySelectorAll('.results-table .col-frozen').forEach(cell => {
+      const idx = Number(cell.dataset.colIndex);
+      if (!Number.isNaN(idx) && freezeLeftOffsets[idx] != null) {
+        cell.style.left = freezeLeftOffsets[idx] + 'px';
+      }
+    });
+    syncStickyHeaderOffset();
+  }
+
+  function applyFreezeToCell(cell, colIndex) {
+    const col = SEARCH_COLUMNS[colIndex];
+    if (!col || !col.freeze) return;
+    cell.classList.add('col-frozen');
+    cell.dataset.colIndex = String(colIndex);
+    if (colIndex === SEARCH_COLUMNS.length - 1 || !SEARCH_COLUMNS[colIndex + 1]?.freeze) {
+      cell.classList.add('col-frozen-last');
+    }
+    if (freezeLeftOffsets[colIndex] != null) {
+      cell.style.left = freezeLeftOffsets[colIndex] + 'px';
+    }
+  }
+
   function ensureSearchTableFrame() {
-    if (builtSearchTableId === SEARCH_TABLE_BUILD_ID && searchTableFrameReady) return;
-    builtSearchTableId = SEARCH_TABLE_BUILD_ID;
+    const buildId = getSearchTableBuildId();
+    if (builtSearchTableId === buildId && searchTableFrameReady) return;
+    builtSearchTableId = buildId;
     searchTableFrameReady = false;
     if (resultsColgroup) {
       resultsColgroup.innerHTML = '';
@@ -1552,9 +1659,10 @@
     // Header labels
     const theadTr = document.createElement('tr');
     theadTr.className = 'results-thead-labels';
-    SEARCH_COLUMNS.forEach(col => {
+    SEARCH_COLUMNS.forEach((col, idx) => {
       const th = document.createElement('th');
       th.textContent = col.label;
+      applyFreezeToCell(th, idx);
       theadTr.appendChild(th);
     });
     resultsThead.appendChild(theadTr);
@@ -1564,8 +1672,9 @@
     if (anyFilters) {
       const filterTr = document.createElement('tr');
       filterTr.className = 'results-thead-filters';
-      SEARCH_COLUMNS.forEach(col => {
+      SEARCH_COLUMNS.forEach((col, idx) => {
         const th = document.createElement('th');
+        applyFreezeToCell(th, idx);
         if (col.filter === 'text') {
           const input = document.createElement('input');
           input.type = 'text';
@@ -1618,7 +1727,7 @@
     }
 
     searchTableFrameReady = true;
-    requestAnimationFrame(syncStickyHeaderOffset);
+    requestAnimationFrame(syncFreezePane);
   }
 
   function renderTotalsRow(results) {
@@ -1649,13 +1758,16 @@
       } else {
         cell.textContent = '';
       }
+      applyFreezeToCell(cell, idx);
       tr.appendChild(cell);
     });
     if (firstSumIdx > 0) {
       const labelCell = document.createElement('td');
-      labelCell.className = 'totals-label';
+      labelCell.className = 'totals-label col-frozen';
       labelCell.textContent = 'Total';
       labelCell.colSpan = firstSumIdx;
+      labelCell.dataset.colIndex = '0';
+      labelCell.style.left = '0px';
       tr.insertBefore(labelCell, tr.firstChild);
     }
     resultsTfoot.appendChild(tr);
@@ -1672,9 +1784,11 @@
       const tr = document.createElement('tr');
       tr.dataset.index = index;
       tr.classList.add('result-row');
-      SEARCH_COLUMNS.forEach(col => {
+      SEARCH_COLUMNS.forEach((col, idx) => {
         const td = document.createElement('td');
         td.textContent = formatSearchCell(row, col.key);
+        if (col.wrap) td.classList.add('col-wrap');
+        applyFreezeToCell(td, idx);
         tr.appendChild(td);
       });
       tr.addEventListener('click', function () {
@@ -1687,6 +1801,7 @@
       resultsTbody.appendChild(tr);
     });
     renderTotalsRow(results);
+    requestAnimationFrame(syncFreezePane);
   }
 
   async function loadFilterOptions() {
@@ -1759,12 +1874,12 @@
         throw new Error(err.error || 'Search failed');
       }
       const data = await res.json();
-      searchResults = data.results || [];
+      searchResults = enrichSearchResults(data.results || []);
       ensureSearchTableFrame();
       renderSearchResultsBody(applyHeaderTextFilters(searchResults));
       resultsSection.classList.remove('hidden');
       if (resultsPlaceholder) resultsPlaceholder.classList.add('hidden');
-      requestAnimationFrame(syncStickyHeaderOffset);
+      requestAnimationFrame(syncFreezePane);
       if (searchResults.length === 0) showMessage('No jobs found. Try different filters.', '');
     } catch (e) {
       showMessage(e.message || 'Search failed.', 'error');
@@ -1957,7 +2072,7 @@
   loadFilterOptions();
   setupExcelDropdowns();
   window.addEventListener('resize', () => {
-    if (searchTableFrameReady) syncStickyHeaderOffset();
+    if (searchTableFrameReady) syncFreezePane();
   });
   if (downloadJobCardBtn) downloadJobCardBtn.addEventListener('click', onDownloadJobCardFromTable);
   if (downloadAndPrintBtn) downloadAndPrintBtn.addEventListener('click', onDownloadAndPrint);

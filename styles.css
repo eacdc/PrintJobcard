@@ -346,18 +346,19 @@ body {
   font-size: 0.8rem;
 }
 
-/* Table wrapper: vertical scroll only (table fits viewport width) */
+/* Table wrapper: vertical + horizontal scroll (freeze pane keeps left cols fixed) */
 .table-wrap {
   flex: 1;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .results-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 1800px;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.8rem;
   table-layout: fixed;
 }
@@ -373,6 +374,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  background: var(--card-bg);
+}
+
+.results-table td.col-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
 }
 
 .results-table th .header-filter-input {
@@ -442,6 +451,47 @@ body {
   background: var(--bg-secondary);
   font-weight: 500;
   box-shadow: 0 1px 0 var(--border-color);
+}
+
+/* Freeze pane: columns through Order Qty stay fixed while scrolling horizontally */
+.results-table th.col-frozen,
+.results-table td.col-frozen {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.results-table thead tr.results-thead-labels th.col-frozen {
+  z-index: 5;
+  background: var(--bg-primary);
+}
+
+.results-table thead tr.results-thead-filters th.col-frozen {
+  z-index: 4;
+  background: var(--bg-secondary);
+}
+
+.results-table tbody td.col-frozen {
+  z-index: 1;
+  background: var(--card-bg);
+}
+
+.results-table tbody tr.result-row:hover td.col-frozen {
+  background: #334155;
+}
+
+.results-table tbody tr.result-row.selected td.col-frozen {
+  background: #1e3a5f;
+}
+
+.results-table tfoot td.col-frozen {
+  z-index: 3;
+  background: var(--bg-secondary);
+}
+
+.results-table th.col-frozen-last,
+.results-table td.col-frozen-last {
+  box-shadow: 2px 0 0 var(--border-color);
 }
 
 .results-table tbody tr.result-row {
